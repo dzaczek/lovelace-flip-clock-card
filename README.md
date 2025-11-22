@@ -1,7 +1,7 @@
-# Flip Clock Card 
+# Flip Clock Card ![Preview card](./img/flipfalp.jpg)
 
 Yo! Here is a neat little card I whipped up for Home Assistant. It's a retro style Flip Clock (split flap display) that actually animates properly.
-
+![Preview card](./img/flipconf.jpg)
 I wasn't happy with the static clocks out there, so I made this one. It has a real 3D fall down animation with a satisfying little bounce at the end. Looks super clean on wall mounted tablets.
 
 ## Why you might want this
