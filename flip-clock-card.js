@@ -4,6 +4,13 @@ class FlipClockCard extends HTMLElement {
     this.card_size = config.size || 100;
     this.time_format = config.time_format || '24';
     this.show_seconds = config.show_seconds === true || config.show_seconds === 'true';
+    this.anim_speed = config.animation_speed || 0.6;
+    
+    // Base theme selection
+    this.theme = config.theme || 'classic';
+    
+    // CUSTOM STYLE: User overrides
+    this.custom_style = config.custom_style || null;
 
     this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
 
@@ -22,15 +29,149 @@ class FlipClockCard extends HTMLElement {
         this.attachShadow({ mode: 'open' });
       }
 
+      const halfSpeed = this.anim_speed / 2;
+
+      // --- 1. DEFINICJE GOTOWYCH MOTYWÓW ---
+      const themes = {
+        'classic': {
+          bg: '#333',
+          text: '#eee',
+          font: "'Roboto Mono', monospace",
+          radius: '0.1',
+          shadow: '0 4px 10px rgba(0,0,0,0.5)',
+          line: 'rgba(0,0,0,0.4)',
+          glow: 'none'
+        },
+        'ios-light': {
+          bg: '#ffffff',
+          text: '#1c1c1e',
+          font: "-apple-system, sans-serif",
+          radius: '0.15',
+          shadow: '0 8px 20px rgba(0,0,0,0.15)',
+          line: 'rgba(0,0,0,0.1)',
+          glow: 'none'
+        },
+        'ios-dark': {
+          bg: '#1c1c1e',
+          text: '#ffffff',
+          font: "-apple-system, sans-serif",
+          radius: '0.15',
+          shadow: '0 8px 20px rgba(0,0,0,0.4)',
+          line: 'rgba(255,255,255,0.1)',
+          glow: 'none'
+        },
+        'neon': {
+          bg: '#000000',
+          text: '#39ff14',
+          font: "'Courier New', monospace",
+          radius: '0.05',
+          shadow: '0 0 15px rgba(57, 255, 20, 0.3)',
+          line: 'rgba(57, 255, 20, 0.2)',
+          glow: '0 0 10px rgba(57, 255, 20, 0.8)'
+        },
+        'red-stealth': {
+          bg: '#0f0f0f',
+          text: '#ff3b30',
+          font: "'Courier New', monospace",
+          radius: '0.05',
+          shadow: '0 0 10px rgba(255, 0, 0, 0.2)',
+          line: 'rgba(255, 0, 0, 0.15)',
+          glow: '0 0 5px rgba(255, 59, 48, 0.6)'
+        },
+        'synthwave': {
+          bg: '#240046',
+          text: '#ff00ff',
+          font: "sans-serif",
+          radius: '0.1',
+          shadow: '0 5px 15px rgba(255, 0, 255, 0.4)',
+          line: 'rgba(255, 0, 255, 0.3)',
+          glow: '0 0 8px rgba(255, 0, 255, 0.7)'
+        },
+        'e-ink': {
+          bg: '#f4f4f4',
+          text: '#111',
+          font: "'Times New Roman', serif",
+          radius: '0.02',
+          shadow: 'none',
+          line: 'rgba(0,0,0,0.8)',
+          glow: 'none'
+        },
+        'terminal': {
+          bg: '#000000',
+          text: '#33ff00',
+          font: "'Lucida Console', Monaco, monospace",
+          radius: '0',
+          shadow: 'none',
+          line: 'rgba(51, 255, 0, 0.3)',
+          glow: 'none'
+        },
+        'wood': {
+          bg: '#4e342e',
+          text: '#d7ccc8',
+          font: "serif",
+          radius: '0.12',
+          shadow: '0 4px 8px rgba(0,0,0,0.6)',
+          line: 'rgba(0,0,0,0.5)',
+          glow: 'none'
+        },
+        'trek-orange': {
+          bg: '#ff9900',
+          text: '#000000',
+          font: "'Antonio', 'Arial Narrow', sans-serif",
+          radius: '0.3',
+          shadow: 'none',
+          line: 'rgba(0,0,0,0.2)',
+          glow: 'none'
+        },
+        'trek-red': {
+          bg: '#cc2200',
+          text: '#000000',
+          font: "'Antonio', 'Arial Narrow', sans-serif",
+          radius: '0.3',
+          shadow: 'none',
+          line: 'rgba(0,0,0,0.2)',
+          glow: 'none'
+        },
+        'trek-blue': {
+          bg: '#99ccff',
+          text: '#000000',
+          font: "'Antonio', 'Arial Narrow', sans-serif",
+          radius: '0.3',
+          shadow: 'none',
+          line: 'rgba(0,0,0,0.2)',
+          glow: 'none'
+        },
+        'borg': {
+          bg: '#000000',
+          text: '#44ff44',
+          font: "'Consolas', 'Lucida Console', monospace",
+          radius: '0',
+          shadow: '0 0 5px #00aa00, inset 0 0 20px rgba(0,50,0, 0.9)', 
+          line: 'rgba(0, 255, 0, 0.3)',
+          glow: '0 0 8px rgba(50, 255, 50, 0.6)'
+        }
+      };
+
+      // --- 2. LOGIKA ŁĄCZENIA STYLI ---
+      // Pobieramy bazowy motyw
+      let base = themes[this.theme] || themes['classic'];
+
+      // Jeśli użytkownik podał custom_style, nadpisujemy wartości bazy
+      let t = this.custom_style ? { ...base, ...this.custom_style } : base;
+
       const style = document.createElement('style');
       style.textContent = `
         :host {
           display: block;
           --card-size: ${this.card_size}px;
-          --bg-color: #333;
-          --text-color: #eee;
-          /* Cały ruch trwa 0.6s, ale jest podzielony na pół */
-          --half-speed: 0.3s; 
+          --flip-bg: ${t.bg};
+          --flip-text: ${t.text};
+          --flip-font: ${t.font};
+          --flip-radius: calc(var(--card-size) * ${t.radius});
+          --flip-shadow: ${t.shadow};
+          --flip-line: ${t.line};
+          --flip-glow: ${t.glow};
+          --half-speed: ${halfSpeed}s; 
         }
         .clock-container {
           display: flex;
@@ -38,7 +179,7 @@ class FlipClockCard extends HTMLElement {
           align-items: center;
           padding: 20px;
           background: transparent;
-          perspective: 1000px; /* Głebia 3D */
+          perspective: 1000px;
         }
         .digit-group {
           display: flex;
@@ -46,24 +187,30 @@ class FlipClockCard extends HTMLElement {
         }
         .separator {
           font-size: calc(var(--card-size) * 0.6);
-          color: var(--text-color);
+          color: var(--flip-text);
           margin: 0 8px;
           font-weight: bold;
           padding-top: calc(var(--card-size) * 0.1);
-          font-family: 'Roboto Mono', monospace;
+          font-family: var(--flip-font);
+          text-shadow: var(--flip-glow);
+          
+          /* Logika separatora dla Treka i Borga */
+          ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${t.bg}; opacity: 0.8;` : ''}
+          ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${t.text};` : ''}
         }
 
         .flip-unit {
           position: relative;
           width: calc(var(--card-size) * 0.7);
           height: var(--card-size);
-          font-family: 'Roboto Mono', monospace;
+          font-family: var(--flip-font);
           font-weight: 700;
           font-size: calc(var(--card-size) * 0.8);
-          border-radius: calc(var(--card-size) * 0.1);
-          background: var(--bg-color);
-          color: var(--text-color);
-          box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Mocniejszy cień */
+          border-radius: var(--flip-radius);
+          background: var(--flip-bg);
+          color: var(--flip-text);
+          box-shadow: var(--flip-shadow);
+          text-shadow: var(--flip-glow);
           transform-style: preserve-3d;
         }
 
@@ -73,26 +220,32 @@ class FlipClockCard extends HTMLElement {
           width: 100%;
           height: 50%;
           overflow: hidden;
-          background: var(--bg-color);
+          background: var(--flip-bg);
           -webkit-backface-visibility: hidden;
           backface-visibility: hidden;
         }
 
+        /* BORG SPECIAL BORDER */
+        ${this.theme === 'borg' ? `
+          .upper, .lower { border: 1px solid rgba(0, 255, 0, 0.3); }
+          .upper { border-bottom: none; }
+          .lower { border-top: none; }
+        ` : ''}
+
         .upper {
           top: 0;
-          border-radius: calc(var(--card-size) * 0.1) calc(var(--card-size) * 0.1) 0 0;
-          transform-origin: 50% 100%; /* Oś obrotu na DOLE górnej połówki */
+          border-radius: var(--flip-radius) var(--flip-radius) 0 0;
+          transform-origin: 50% 100%;
           z-index: 1;
         }
         
         .lower {
           bottom: 0;
-          border-radius: 0 0 calc(var(--card-size) * 0.1) calc(var(--card-size) * 0.1);
-          transform-origin: 50% 0%; /* Oś obrotu na GÓRZE dolnej połówki */
+          border-radius: 0 0 var(--flip-radius) var(--flip-radius);
+          transform-origin: 50% 0%;
           z-index: 1;
         }
 
-        /* SPAN FIX (Wyrównanie tekstu) */
         .upper span, .lower span {
             display: flex;
             justify-content: center;
@@ -104,7 +257,6 @@ class FlipClockCard extends HTMLElement {
         .upper span { transform: translateY(0); }
         .lower span { transform: translateY(-50%); }
 
-        /* Linia podziału */
         .upper::after {
           content: "";
           position: absolute;
@@ -112,13 +264,11 @@ class FlipClockCard extends HTMLElement {
           left: 0;
           width: 100%;
           height: 1px;
-          background: rgba(0,0,0,0.4);
+          background: var(--flip-line);
         }
 
-        /* WARSTWY */
-        .upper-back, .lower-back { z-index: 1; } /* Tła statyczne */
+        .upper-back, .lower-back { z-index: 1; }
         
-        /* KLAPKI ANIMOWANE */
         .upper.flip-card { 
             z-index: 10; 
             transform-origin: bottom; 
@@ -126,34 +276,28 @@ class FlipClockCard extends HTMLElement {
         .lower.flip-card { 
             z-index: 10; 
             transform-origin: top; 
-            transform: rotateX(90deg); /* Startuje ukryta (poziomo) */
+            transform: rotateX(90deg); 
         }
-
-        /* --- KLUCZOWE ZMIANY W ANIMACJI --- */
-
-        /* 1. Faza: Górna klapka opada do poziomu (i znika) */
+        
         .flip-down-top {
           animation: rotateTop var(--half-speed) linear forwards;
         }
 
-        /* 2. Faza: Dolna klapka przejmuje ruch OD RAZU po górnej */
         .flip-down-bottom {
           animation: rotateBottom var(--half-speed) linear forwards; 
-          animation-delay: var(--half-speed); /* Czeka aż górna skończy! */
+          animation-delay: var(--half-speed);
         }
 
-        /* Górna obraca się od 0 do -90 (kładzie się na płasko) */
         @keyframes rotateTop {
           0% { transform: rotateX(0deg); }
           100% { transform: rotateX(-90deg); }
         }
 
-        /* Dolna obraca się od 90 (płasko) do 0 (pionowo) + Odbicie */
         @keyframes rotateBottom {
           0% { transform: rotateX(90deg); }
-          60% { transform: rotateX(0deg); } /* Szybkie uderzenie w dół */
-          80% { transform: rotateX(15deg); } /* Odbicie w górę */
-          100% { transform: rotateX(0deg); } /* Spoczynek */
+          60% { transform: rotateX(0deg); }
+          80% { transform: rotateX(15deg); }
+          100% { transform: rotateX(0deg); }
         }
       `;
       
@@ -239,24 +383,18 @@ class FlipClockCard extends HTMLElement {
       const topFlip = el.querySelector('.upper.flip-card span');
       const bottomFlip = el.querySelector('.lower.flip-card span');
 
-      // USTAWIENIE WARTOŚCI (Logika fizyczna)
-      
-      // 1. Pod spodem (co będzie widoczne po opadnięciu):
-      topBack.textContent = newValue;       // Nowa góra
-      bottomBack.textContent = previousValue; // Stary dół (zostaje, dopóki nie zostanie zakryty)
+      topBack.textContent = newValue;
+      bottomBack.textContent = previousValue; 
+      topFlip.textContent = previousValue;
+      bottomFlip.textContent = newValue;
 
-      // 2. Klapka (to co się rusza):
-      topFlip.textContent = previousValue;  // Stara góra (zaczyna opadać)
-      bottomFlip.textContent = newValue;    // Nowy dół (jest rewersem starej góry)
-
-      // RESTART ANIMACJI
       const topFlipCard = el.querySelector('.upper.flip-card');
       const bottomFlipCard = el.querySelector('.lower.flip-card');
 
       topFlipCard.classList.remove('flip-down-top');
       bottomFlipCard.classList.remove('flip-down-bottom');
       
-      void el.offsetWidth; // Magic Reflow
+      void el.offsetWidth;
 
       topFlipCard.classList.add('flip-down-top');
       bottomFlipCard.classList.add('flip-down-bottom');
