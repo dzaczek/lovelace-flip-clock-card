@@ -1,1 +1,1 @@
-*Files for ducumentation 
+*Files for documentation

@@ -1,41 +1,189 @@
+/**
+ * Flip Clock Card for Home Assistant
+ * Version: 25.0.1-beta
+ * A retro-style flip clock card with 3D animations
+ */
 class FlipClockCard extends HTMLElement {
     constructor() {
         super();
         this.timer = null;
         this.observer = null;
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
-        console.log("🚀 FlipClockCard: INSTANCE CREATED. V24.0.1"); // fancier start log
+        this.debug = false; // Set to true for development debugging
+        this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
+        this.version = '25.0.1-beta';
+    }
+
+    /**
+     * Sanitize CSS value to prevent injection attacks
+     * @param {string} value - CSS value to sanitize
+     * @returns {string} - Sanitized CSS value
+     */
+    sanitizeCSSValue(value) {
+        if (typeof value !== 'string') return '';
+        // Remove potentially dangerous characters and patterns
+        return value
+            .replace(/[<>'"`]/g, '') // Remove HTML/JS injection chars
+            .replace(/javascript:/gi, '') // Remove javascript: protocol
+            .replace(/expression\s*\(/gi, '') // Remove CSS expressions
+            .replace(/url\s*\(\s*['"]?javascript:/gi, '') // Remove javascript URLs
+            .trim();
+    }
+
+    /**
+     * Validate and sanitize color value (hex, rgb, rgba, or named color)
+     * @param {string} color - Color value to validate
+     * @returns {string} - Validated color or empty string
+     */
+    validateColor(color) {
+        if (typeof color !== 'string') return '';
+        const sanitized = this.sanitizeCSSValue(color);
+        // Match hex, rgb, rgba, hsl, hsla, or named colors
+        const colorRegex = /^(#[0-9a-fA-F]{3,8}|rgb\([^)]+\)|rgba\([^)]+\)|hsl\([^)]+\)|hsla\([^)]+\)|[a-zA-Z]+)$/;
+        return colorRegex.test(sanitized) ? sanitized : '';
+    }
+
+    /**
+     * Validate and sanitize font-family value
+     * @param {string} font - Font family to validate
+     * @returns {string} - Validated font or empty string
+     */
+    validateFontFamily(font) {
+        if (typeof font !== 'string') return '';
+        const sanitized = this.sanitizeCSSValue(font);
+        // Allow alphanumeric, spaces, hyphens, commas, quotes for font names
+        const fontRegex = /^[a-zA-Z0-9\s\-,'"]+$/;
+        return fontRegex.test(sanitized) ? sanitized : '';
+    }
+
+    /**
+     * Validate number within range
+     * @param {*} value - Value to validate
+     * @param {number} min - Minimum value
+     * @param {number} max - Maximum value
+     * @param {number} defaultValue - Default if invalid
+     * @returns {number} - Validated number
+     */
+    validateNumber(value, min, max, defaultValue) {
+        const num = typeof value === 'number' ? value : parseFloat(value);
+        if (isNaN(num) || num < min || num > max) {
+            return defaultValue;
+        }
+        return num;
+    }
+
+    /**
+     * Validate theme name against whitelist
+     * @param {string} theme - Theme name to validate
+     * @returns {string} - Valid theme or 'classic' as default
+     */
+    validateTheme(theme) {
+        const validThemes = [
+            'classic', 'ios-light', 'ios-dark', 'neon', 'red-stealth',
+            'synthwave', 'e-ink', 'terminal', 'wood', 'trek-orange',
+            'trek-red', 'trek-blue', 'borg'
+        ];
+        return typeof theme === 'string' && validThemes.includes(theme) ? theme : 'classic';
+    }
+
+    /**
+     * Sanitize custom style object
+     * @param {object} customStyle - Custom style object to sanitize
+     * @returns {object} - Sanitized custom style object
+     */
+    sanitizeCustomStyle(customStyle) {
+        if (!customStyle || typeof customStyle !== 'object') return null;
+        
+        const sanitized = {};
+        if (customStyle.bg !== undefined) {
+            const bg = this.validateColor(customStyle.bg);
+            if (bg) sanitized.bg = bg;
+        }
+        if (customStyle.text !== undefined) {
+            const text = this.validateColor(customStyle.text);
+            if (text) sanitized.text = text;
+        }
+        if (customStyle.font !== undefined) {
+            const font = this.validateFontFamily(customStyle.font);
+            if (font) sanitized.font = font;
+        }
+        if (customStyle.radius !== undefined) {
+            const radius = this.validateNumber(customStyle.radius, 0, 1, 0.1);
+            sanitized.radius = String(radius);
+        }
+        if (customStyle.shadow !== undefined) {
+            sanitized.shadow = this.sanitizeCSSValue(customStyle.shadow);
+        }
+        if (customStyle.line !== undefined) {
+            const line = this.validateColor(customStyle.line);
+            if (line) sanitized.line = line;
+        }
+        if (customStyle.glow !== undefined) {
+            sanitized.glow = this.sanitizeCSSValue(customStyle.glow);
+        }
+        
+        return Object.keys(sanitized).length > 0 ? sanitized : null;
     }
 
     setConfig(config) {
-        // Configuration parameters
-        this.config = config;
-        this.card_size = config.size || 100;
-        this.time_format = config.time_format || '24';
-        this.show_seconds = config.show_seconds === true || config.show_seconds === 'true';
-        this.anim_speed = config.animation_speed || 0.6;
-        this.theme = config.theme || 'classic';
-        this.custom_style = config.custom_style || null;
+        try {
+            // Configuration parameters with validation
+            this.config = config || {};
+            
+            // Validate and sanitize size (10-500px range)
+            this.card_size = this.validateNumber(config?.size, 10, 500, 100);
+            
+            // Validate time_format (only '12' or '24')
+            this.time_format = (config?.time_format === '12' || config?.time_format === '24') 
+                ? config.time_format 
+                : '24';
+            
+            // Validate show_seconds (boolean)
+            this.show_seconds = config?.show_seconds === true || config?.show_seconds === 'true';
+            
+            // Validate and sanitize animation_speed (0.1-2.0 seconds range)
+            this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
+            
+            // Validate theme against whitelist
+            this.theme = this.validateTheme(config?.theme);
+            
+            // Sanitize custom_style
+            this.custom_style = this.sanitizeCustomStyle(config?.custom_style);
 
-        // Reset the element if reconfigured
-        if (this.content) {
-            this.content.remove();
-            this.content = null;
-            // Stop observer and timer if reconfiguring the card
-            if (this.observer) this.observer.disconnect();
-            if (this.timer) clearInterval(this.timer);
-            this.timer = null;
+            // Reset the element if reconfigured
+            if (this.content) {
+                this.content.remove();
+                this.content = null;
+                // Clear element cache on reconfiguration
+                this.digitElementsCache = {};
+                // Stop observer and timer if reconfiguring the card
+                if (this.observer) this.observer.disconnect();
+                if (this.timer) clearInterval(this.timer);
+                this.timer = null;
+            }
+            
+            this.render();
+        } catch (error) {
+            // Fallback to safe defaults on error
+            this.card_size = 100;
+            this.time_format = '24';
+            this.show_seconds = false;
+            this.anim_speed = 0.6;
+            this.theme = 'classic';
+            this.custom_style = null;
+            if (this.debug) {
+                console.error("FlipClockCard: Configuration error:", error);
+            }
+            this.render();
         }
-        
-        this.render();
-        console.log("✅ FlipClockCard: CONFIGURATION LOADED.");
     }
 
     render() {
-        if (!this.content) {
-            if (!this.shadowRoot) {
-                this.attachShadow({ mode: 'open' });
-            }
+        try {
+            if (!this.content) {
+                if (!this.shadowRoot) {
+                    this.attachShadow({ mode: 'open' });
+                }
 
             const halfSpeed = this.anim_speed / 2;
 
@@ -164,19 +312,30 @@ class FlipClockCard extends HTMLElement {
             let base = themes[this.theme] || themes['classic'];
             let t = this.custom_style ? { ...base, ...this.custom_style } : base;
 
+            // Sanitize all CSS values before inserting into template
+            const sanitizedCardSize = this.validateNumber(this.card_size, 10, 500, 100);
+            const sanitizedHalfSpeed = this.validateNumber(halfSpeed, 0.05, 1.0, 0.3);
+            const sanitizedBg = this.validateColor(t.bg) || base.bg;
+            const sanitizedText = this.validateColor(t.text) || base.text;
+            const sanitizedFont = this.validateFontFamily(t.font) || base.font;
+            const sanitizedRadius = this.validateNumber(parseFloat(t.radius), 0, 1, 0.1);
+            const sanitizedShadow = this.sanitizeCSSValue(t.shadow) || base.shadow;
+            const sanitizedLine = this.validateColor(t.line) || base.line;
+            const sanitizedGlow = this.sanitizeCSSValue(t.glow) || base.glow;
+
             const style = document.createElement('style');
             style.textContent = `
                 :host {
                     display: block;
-                    --card-size: ${this.card_size}px;
-                    --flip-bg: ${t.bg};
-                    --flip-text: ${t.text};
-                    --flip-font: ${t.font};
-                    --flip-radius: calc(var(--card-size) * ${t.radius});
-                    --flip-shadow: ${t.shadow};
-                    --flip-line: ${t.line};
-                    --flip-glow: ${t.glow};
-                    --half-speed: ${halfSpeed}s; 
+                    --card-size: ${sanitizedCardSize}px;
+                    --flip-bg: ${sanitizedBg};
+                    --flip-text: ${sanitizedText};
+                    --flip-font: ${sanitizedFont};
+                    --flip-radius: calc(var(--card-size) * ${sanitizedRadius});
+                    --flip-shadow: ${sanitizedShadow};
+                    --flip-line: ${sanitizedLine};
+                    --flip-glow: ${sanitizedGlow};
+                    --half-speed: ${sanitizedHalfSpeed}s; 
                 }
                 .clock-container {
                     display: flex;
@@ -200,8 +359,8 @@ class FlipClockCard extends HTMLElement {
                     text-shadow: var(--flip-glow);
                     
                     /* Separator logic for Trek and Borg themes */
-                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${t.bg}; opacity: 0.8;` : ''}
-                    ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${t.text};` : ''}
+                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.8;` : ''}
+                    ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
                 }
 
                 .flip-unit {
@@ -276,21 +435,25 @@ class FlipClockCard extends HTMLElement {
                 
                 .upper.flip-card { 
                     z-index: 10; 
-                    transform-origin: bottom; 
+                    transform-origin: bottom;
+                    will-change: transform;
                 }
                 .lower.flip-card { 
                     z-index: 10; 
                     transform-origin: top; 
-                    transform: rotateX(90deg); 
+                    transform: rotateX(90deg);
+                    will-change: transform;
                 }
                 
                 .flip-down-top {
                     animation: rotateTop var(--half-speed) linear forwards;
+                    will-change: transform;
                 }
 
                 .flip-down-bottom {
                     animation: rotateBottom var(--half-speed) linear forwards; 
                     animation-delay: var(--half-speed);
+                    will-change: transform;
                 }
 
                 @keyframes rotateTop {
@@ -343,82 +506,175 @@ class FlipClockCard extends HTMLElement {
 
             container.innerHTML = html;
             this.shadowRoot.innerHTML = ''; 
-            this.shadowRoot.appendChild(style);
-            this.shadowRoot.appendChild(container);
-            this.content = container;
+                this.shadowRoot.appendChild(style);
+                this.shadowRoot.appendChild(container);
+                this.content = container;
+                
+                // Cache DOM elements for performance
+                this.cacheDigitElements();
+            }
+            if (this.debug) {
+                console.log("🛠️ FlipClockCard: HTML RENDERED.");
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.error("FlipClockCard: Render error:", error);
+            }
         }
-        console.log("🛠️ FlipClockCard: HTML RENDERED.");
+    }
+
+    /**
+     * Cache DOM elements for all digits to avoid repeated queries
+     */
+    cacheDigitElements() {
+        if (!this.shadowRoot) return;
+        
+        const digitIds = ['h1', 'h2', 'm1', 'm2'];
+        if (this.show_seconds) {
+            digitIds.push('s1', 's2');
+        }
+        
+        digitIds.forEach(id => {
+            const el = this.shadowRoot.getElementById(id);
+            if (el) {
+                this.digitElementsCache[id] = {
+                    element: el,
+                    topBack: el.querySelector('.upper-back span'),
+                    bottomBack: el.querySelector('.lower-back span'),
+                    topFlip: el.querySelector('.upper.flip-card span'),
+                    bottomFlip: el.querySelector('.lower.flip-card span'),
+                    topFlipCard: el.querySelector('.upper.flip-card'),
+                    bottomFlipCard: el.querySelector('.lower.flip-card')
+                };
+            }
+        });
     }
 
     startClock() {
         if (this.timer) {
-            console.log("⚠️ FlipClockCard: TIMER ALREADY RUNNING. Aborting start.");
+            if (this.debug) {
+                console.log("⚠️ FlipClockCard: TIMER ALREADY RUNNING. Aborting start.");
+            }
             return;
         }
 
         const update = () => {
-            const now = new Date();
-            let h = now.getHours();
-            // 12-hour format logic
-            if (this.time_format === '12') h = h % 12 || 12;
-            
-            const hStr = String(h).padStart(2, '0');
-            const mStr = String(now.getMinutes()).padStart(2, '0');
-            const sStr = String(now.getSeconds()).padStart(2, '0');
-            
-            this.updateDigit('h1', hStr[0]);
-            this.updateDigit('h2', hStr[1]);
-            this.updateDigit('m1', mStr[0]);
-            this.updateDigit('m2', mStr[1]);
+            try {
+                const now = new Date();
+                let h = now.getHours();
+                // 12-hour format logic
+                if (this.time_format === '12') h = h % 12 || 12;
+                
+                const hStr = String(h).padStart(2, '0');
+                const mStr = String(now.getMinutes()).padStart(2, '0');
+                const sStr = String(now.getSeconds()).padStart(2, '0');
+                
+                this.updateDigit('h1', hStr[0]);
+                this.updateDigit('h2', hStr[1]);
+                this.updateDigit('m1', mStr[0]);
+                this.updateDigit('m2', mStr[1]);
 
-            if (this.show_seconds) {
-                this.updateDigit('s1', sStr[0]);
-                this.updateDigit('s2', sStr[1]);
+                if (this.show_seconds) {
+                    this.updateDigit('s1', sStr[0]);
+                    this.updateDigit('s2', sStr[1]);
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.error("FlipClockCard: Clock update error:", error);
+                }
             }
         };
         
-        update(); 
-        this.timer = setInterval(update, 1000); 
-        console.log("🟢 FlipClockCard: TIMER STARTED!");
+        try {
+            update(); 
+            this.timer = setInterval(update, 1000); 
+            if (this.debug) {
+                console.log("🟢 FlipClockCard: TIMER STARTED!");
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.error("FlipClockCard: Error starting clock:", error);
+            }
+        }
     }
 
     stopClock() {
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
-            console.log("🔴 FlipClockCard: TIMER STOPPED!");
+            if (this.debug) {
+                console.log("🔴 FlipClockCard: TIMER STOPPED!");
+            }
         }
     }
 
     updateDigit(id, newValue) {
         if (this.currentDigits[id] !== newValue) {
-            const el = this.shadowRoot.getElementById(id);
-            if (!el) return;
+            try {
+                // Use cached elements if available, otherwise fallback to query
+                let cached = this.digitElementsCache[id];
+                
+                if (!cached) {
+                    // Fallback: query elements if cache is missing
+                    if (!this.shadowRoot) return;
+                    
+                    const el = this.shadowRoot.getElementById(id);
+                    if (!el) {
+                        if (this.debug) {
+                            console.warn(`FlipClockCard: Element with id '${id}' not found`);
+                        }
+                        return;
+                    }
+                    
+                    cached = {
+                        element: el,
+                        topBack: el.querySelector('.upper-back span'),
+                        bottomBack: el.querySelector('.lower-back span'),
+                        topFlip: el.querySelector('.upper.flip-card span'),
+                        bottomFlip: el.querySelector('.lower.flip-card span'),
+                        topFlipCard: el.querySelector('.upper.flip-card'),
+                        bottomFlipCard: el.querySelector('.lower.flip-card')
+                    };
+                    
+                    // Cache for future use
+                    this.digitElementsCache[id] = cached;
+                }
 
-            const previousValue = this.currentDigits[id] === null ? newValue : this.currentDigits[id];
-            this.currentDigits[id] = newValue;
+                if (!cached.topBack || !cached.bottomBack || !cached.topFlip || !cached.bottomFlip) {
+                    if (this.debug) {
+                        console.warn(`FlipClockCard: Missing required elements for digit '${id}'`);
+                    }
+                    return;
+                }
 
-            const topBack = el.querySelector('.upper-back span');
-            const bottomBack = el.querySelector('.lower-back span');
-            const topFlip = el.querySelector('.upper.flip-card span');
-            const bottomFlip = el.querySelector('.lower.flip-card span');
+                const previousValue = this.currentDigits[id] === null ? newValue : this.currentDigits[id];
+                this.currentDigits[id] = newValue;
 
-            topBack.textContent = newValue;
-            bottomBack.textContent = previousValue; 
-            topFlip.textContent = previousValue;
-            bottomFlip.textContent = newValue;
+                cached.topBack.textContent = newValue;
+                cached.bottomBack.textContent = previousValue; 
+                cached.topFlip.textContent = previousValue;
+                cached.bottomFlip.textContent = newValue;
 
-            const topFlipCard = el.querySelector('.upper.flip-card');
-            const bottomFlipCard = el.querySelector('.lower.flip-card');
+                if (!cached.topFlipCard || !cached.bottomFlipCard) {
+                    if (this.debug) {
+                        console.warn(`FlipClockCard: Missing flip card elements for digit '${id}'`);
+                    }
+                    return;
+                }
 
-            topFlipCard.classList.remove('flip-down-top');
-            bottomFlipCard.classList.remove('flip-down-bottom');
-            
-            // Forces reflow (restarts CSS animation)
-            void el.offsetWidth;
+                cached.topFlipCard.classList.remove('flip-down-top');
+                cached.bottomFlipCard.classList.remove('flip-down-bottom');
+                
+                // Forces reflow (restarts CSS animation)
+                void cached.element.offsetWidth;
 
-            topFlipCard.classList.add('flip-down-top');
-            bottomFlipCard.classList.add('flip-down-bottom');
+                cached.topFlipCard.classList.add('flip-down-top');
+                cached.bottomFlipCard.classList.add('flip-down-bottom');
+            } catch (error) {
+                if (this.debug) {
+                    console.error(`FlipClockCard: Error updating digit '${id}':`, error);
+                }
+            }
         }
     }
 
@@ -427,15 +683,21 @@ class FlipClockCard extends HTMLElement {
      * Called when element visibility changes.
      */
     handleIntersection(entries) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                // Element is visible in the viewport (Returning to the card/dashboard)
-                this.startClock();
-            } else {
-                // Element is not visible (Hidden, scrolled out, on another tab)
-                this.stopClock();
+        try {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Element is visible in the viewport (Returning to the card/dashboard)
+                    this.startClock();
+                } else {
+                    // Element is not visible (Hidden, scrolled out, on another tab)
+                    this.stopClock();
+                }
+            });
+        } catch (error) {
+            if (this.debug) {
+                console.error("FlipClockCard: Intersection observer error:", error);
             }
-        });
+        }
     }
 
     /**
@@ -444,17 +706,29 @@ class FlipClockCard extends HTMLElement {
      */
     connectedCallback() {
         if (typeof IntersectionObserver === 'undefined') {
-            console.error("❌ FlipClockCard: IntersectionObserver is not supported in this environment! Starting timer permanently.");
+            if (this.debug) {
+                console.error("❌ FlipClockCard: IntersectionObserver is not supported in this environment! Starting timer permanently.");
+            }
             // Fallback: Start timer permanently if IO is missing
             this.startClock(); 
             return;
         }
 
         if (!this.observer) {
-            // Create the observer to watch if the element is visible (threshold: 0.1 = 10% visible)
-            this.observer = new IntersectionObserver(this.handleIntersection.bind(this), { threshold: 0.1 });
-            this.observer.observe(this);
-            console.log("👀 FlipClockCard: OBSERVER INITIALIZED.");
+            try {
+                // Create the observer to watch if the element is visible (threshold: 0.1 = 10% visible)
+                this.observer = new IntersectionObserver(this.handleIntersection.bind(this), { threshold: 0.1 });
+                this.observer.observe(this);
+                if (this.debug) {
+                    console.log("👀 FlipClockCard: OBSERVER INITIALIZED.");
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.error("FlipClockCard: Observer initialization error:", error);
+                }
+                // Fallback to permanent timer
+                this.startClock();
+            }
         }
     }
 
@@ -464,9 +738,17 @@ class FlipClockCard extends HTMLElement {
      */
     disconnectedCallback() {
         if (this.observer) {
-            this.observer.disconnect();
-            this.observer = null;
-            console.log("👋 FlipClockCard: OBSERVER DISCONNECTED.");
+            try {
+                this.observer.disconnect();
+                this.observer = null;
+                if (this.debug) {
+                    console.log("👋 FlipClockCard: OBSERVER DISCONNECTED.");
+                }
+            } catch (error) {
+                if (this.debug) {
+                    console.error("FlipClockCard: Observer disconnect error:", error);
+                }
+            }
         }
         this.stopClock();
         // Stop timer as a final measure

@@ -213,6 +213,72 @@ theme: synthwave
 
 ---
 
-That’s it. Drop it on a dashboard, pick a theme, tweak the animation speed and you’ve got a flip clock that looks like it belongs on an airport board, a starship bridge, or your hallway tablet.
+That's it. Drop it on a dashboard, pick a theme, tweak the animation speed and you've got a flip clock that looks like it belongs on an airport board, a starship bridge, or your hallway tablet.
+
+---
+
+## Security & Validation
+
+The card includes built-in input validation and sanitization to prevent CSS injection attacks and ensure safe operation.
+
+### Input Validation
+
+All user inputs are validated and sanitized:
+
+- **`size`**: Must be a number between 10 and 500 pixels (default: 100)
+- **`animation_speed`**: Must be a number between 0.1 and 2.0 seconds (default: 0.6)
+- **`time_format`**: Only accepts `'12'` or `'24'` (default: `'24'`)
+- **`show_seconds`**: Boolean value (default: `false`)
+- **`theme`**: Must be one of the predefined theme names (default: `'classic'`)
+- **`custom_style`**: All CSS values are sanitized:
+  - Colors are validated against CSS color formats (hex, rgb, rgba, hsl, named colors)
+  - Font families are sanitized to prevent injection
+  - CSS values are escaped to prevent XSS attacks
+
+### Safe Defaults
+
+If any invalid input is provided, the card falls back to safe default values. Invalid custom styles are ignored, and the base theme is used instead.
+
+### Security Best Practices
+
+- All CSS values are sanitized before being inserted into the DOM
+- Theme names are validated against a whitelist
+- Custom style properties are validated and sanitized individually
+- Error handling prevents crashes from malicious or malformed input
+
+---
+
+## Troubleshooting
+
+### Clock not updating
+
+- **Check browser console**: Look for any error messages
+- **Verify configuration**: Ensure all required parameters are correctly formatted
+- **Clear browser cache**: Hard refresh (Ctrl+F5 / Cmd+Shift+R) or add `?v=X` to the resource URL
+- **Check visibility**: The clock stops when not visible (uses IntersectionObserver for performance)
+
+### Theme not applying
+
+- **Verify theme name**: Check spelling - theme names are case-sensitive
+- **Check custom_style**: Invalid custom style values are ignored - verify color formats and font names
+- **Fallback behavior**: Invalid themes default to `'classic'`
+
+### Animation issues
+
+- **Animation speed**: Values outside 0.1-2.0 range are clamped to valid range
+- **Performance**: On slower devices, try reducing `animation_speed` or `size`
+- **Browser support**: Requires modern browser with CSS animations support
+
+### Configuration errors
+
+- **Invalid values**: All invalid inputs fall back to safe defaults
+- **Type errors**: Numbers are parsed and validated - strings are converted where appropriate
+- **Missing properties**: Optional properties use sensible defaults
+
+### Performance tips
+
+- **Large sizes**: Very large `size` values (>300px) may impact performance
+- **Multiple instances**: Running many clock cards simultaneously may slow down the dashboard
+- **Browser optimization**: The card uses IntersectionObserver to stop when not visible
 
 If it acts weird: check your browser cache and make sure the `theme` name is spelled correctly before blaming the card 😉
