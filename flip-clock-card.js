@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.4-beta
+ * Version: 25.0.4
  * A retro-style flip clock card with 3D animations
  */
 class FlipClockCard extends HTMLElement {
@@ -11,7 +11,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.4-beta';
+        this.version = '25.0.4';
     }
 
     /**
