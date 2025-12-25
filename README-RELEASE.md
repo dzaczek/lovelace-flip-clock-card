@@ -25,18 +25,22 @@
    git push origin v25.0.1-beta
    ```
 
-2. **GitLab CI will automatically:**
-   - Build the package (zip and tar.gz)
-   - Create artifacts in the build job
+3. **CI/CD will automatically:**
+   - **GitHub Actions**: Automatycznie zbuduje paczkę i utworzy release na GitHub
+   - **GitLab CI**: Zbuduje paczkę (jeśli używasz GitLab)
+   - Artifacts będą dostępne w Actions/Releases
 
-3. **Create GitLab Release:**
+4. **GitHub Release (automatyczny):**
+   - Release zostanie utworzony automatycznie przez GitHub Actions
+   - Zawiera paczki: `.zip` i `.tar.gz`
+   - Oznaczony jako "pre-release" (beta)
+
+5. **GitLab Release (manual, jeśli używasz GitLab):**
    - Go to **Repository > Releases** in GitLab
    - Click **New release**
-   - Select tag: `25.0.1-beta`
+   - Select tag: `v25.0.1-beta`
    - Add release notes
-   - Attach the artifacts from the build job:
-     - `flip-clock-card-25.0.1-beta.zip`
-     - `flip-clock-card-25.0.1-beta.tar.gz`
+   - Attach the artifacts from the build job
 
 ### Manual Build
 
