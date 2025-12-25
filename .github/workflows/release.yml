@@ -2,8 +2,6 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - beta
     tags:
       - 'v*'
       - '*.*.*-*'
@@ -28,8 +26,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
-          else
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            # Fallback for branches: replace slashes with dashes
+            VERSION="${GITHUB_REF#refs/heads/}"
+            VERSION=${VERSION//\//-}
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
