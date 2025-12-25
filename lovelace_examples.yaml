@@ -51,9 +51,10 @@ views:
     cards:
       - type: markdown
         content: '# 🎨 Theme Gallery'
-      - type: grid
+      - square: true
+        type: grid
         title: Modern & Clean
-        columns: 2
+        columns: 4
         cards:
           - type: custom:flip-clock-card
             theme: classic
@@ -67,9 +68,10 @@ views:
           - type: custom:flip-clock-card
             theme: e-ink
             title: E-Ink
-      - type: grid
+      - square: true
+        type: grid
         title: Retro & Glow
-        columns: 2
+        columns: 4
         cards:
           - type: custom:flip-clock-card
             theme: neon
@@ -83,9 +85,10 @@ views:
           - type: custom:flip-clock-card
             theme: red-stealth
             title: Red Stealth
-      - type: grid
+      - square: true
+        type: grid
         title: Natural & Sci-Fi
-        columns: 2
+        columns: 4
         cards:
           - type: custom:flip-clock-card
             theme: wood
