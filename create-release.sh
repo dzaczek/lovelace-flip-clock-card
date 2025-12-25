@@ -34,3 +34,4 @@ git push origin "${VERSION}"
 echo "Tag ${VERSION} created and pushed successfully!"
 echo "GitLab CI will now build the package automatically."
 
+

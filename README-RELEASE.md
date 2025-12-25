@@ -1,18 +1,28 @@
 # Release Instructions
 
-## Creating a Release
+## Branch Strategy
+
+- **`beta`** - Branch dla wersji beta/testowych. Tutaj testujemy nowe funkcje przed merge do master
+- **`main`/`master`** - Branch produkcyjny, tylko stabilne wersje
+
+## Creating a Beta Release
 
 ### Automatic (Recommended)
 
-1. **Create and push a tag:**
+1. **Upewnij się że jesteś na branch beta:**
    ```bash
-   ./create-release.sh 25.0.1-beta
+   git checkout beta
+   ```
+
+2. **Create and push a tag:**
+   ```bash
+   ./create-release.sh v25.0.1-beta
    ```
    
    Or manually:
    ```bash
-   git tag -a 25.0.1-beta -m "Release 25.0.1-beta"
-   git push origin 25.0.1-beta
+   git tag -a v25.0.1-beta -m "Release v25.0.1-beta"
+   git push origin v25.0.1-beta
    ```
 
 2. **GitLab CI will automatically:**
@@ -46,18 +56,48 @@ tar -czf flip-clock-card-25.0.1-beta.tar.gz flip-clock-card/
 
 ## HACS Installation
 
-After creating the release in GitLab:
+After creating the release:
 
 1. Go to **HACS → Frontend** in Home Assistant
 2. Click the 3 dots (top right) → **Custom repositories**
-3. Paste your GitLab repository URL
+3. Paste your repository URL: `https://github.com/dzaczek/lovelace-flip-clock-card`
 4. Choose **Lovelace** as the category
 5. Click **Add**, then install
-6. Select version `25.0.1-beta` from the releases
+6. Select version `v25.0.1-beta` from the releases (lub wybierz branch `beta`)
+
+## Workflow: Beta → Master
+
+1. **Testowanie na branch beta:**
+   ```bash
+   git checkout beta
+   # ... wprowadź zmiany ...
+   git commit -m "Feature: ..."
+   git push origin beta
+   ```
+
+2. **Utwórz beta release:**
+   ```bash
+   git tag -a v25.0.1-beta -m "Beta release"
+   git push origin v25.0.1-beta
+   ```
+
+3. **Po testach, merge do master:**
+   ```bash
+   git checkout main
+   git merge beta
+   git push origin main
+   ```
+
+4. **Utwórz stabilny release:**
+   ```bash
+   git tag -a v25.0.1 -m "Stable release"
+   git push origin v25.0.1
+   ```
 
 ## Version Format
 
 - Use semantic versioning: `MAJOR.MINOR.PATCH`
 - For beta releases: `MAJOR.MINOR.PATCH-beta`
 - Examples: `25.0.1`, `25.0.1-beta`, `25.1.0-rc1`
+
 

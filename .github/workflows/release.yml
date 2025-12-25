@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - beta
     tags:
       - 'v*'
       - '*.*.*-*'
@@ -68,4 +70,5 @@ jobs:
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') || contains(github.ref, '-alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
