@@ -108,6 +108,12 @@ Available themes:
 - `wood` – brown, warm, retro wall clock vibes
 - `trek-orange` / `trek-red` / `trek-blue` – bold colors inspired by Star Trek LCARS-style panels
 - `borg` – black, green, harsh glow, very “resistance is futile”
+- `aviator` – **NEW!** Airport departure board style with Oswald font (Grafana style)
+
+### 🧩 Preview Dashboard
+
+Want to see all themes and configurations in action? 
+Copy the contents of **[lovelace_examples.yaml](lovelace_examples.yaml)** into a new Dashboard (Raw configuration editor) to get a full gallery of every style and option available.
 
 **Example: iOS-style dark**
 

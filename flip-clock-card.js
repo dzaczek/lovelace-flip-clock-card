@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.1-beta
+ * Version: 25.0.2-beta
  * A retro-style flip clock card with 3D animations
  */
 class FlipClockCard extends HTMLElement {
@@ -11,7 +11,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.1-beta';
+        this.version = '25.0.2-beta';
     }
 
     /**
@@ -81,7 +81,7 @@ class FlipClockCard extends HTMLElement {
         const validThemes = [
             'classic', 'ios-light', 'ios-dark', 'neon', 'red-stealth',
             'synthwave', 'e-ink', 'terminal', 'wood', 'trek-orange',
-            'trek-red', 'trek-blue', 'borg'
+            'trek-red', 'trek-blue', 'borg', 'aviator'
         ];
         return typeof theme === 'string' && validThemes.includes(theme) ? theme : 'classic';
     }
@@ -305,6 +305,15 @@ class FlipClockCard extends HTMLElement {
                     shadow: '0 0 5px #00aa00, inset 0 0 20px rgba(0,50,0, 0.9)', 
                     line: 'rgba(0, 255, 0, 0.3)',
                     glow: '0 0 8px rgba(50, 255, 50, 0.6)'
+                },
+                'aviator': {
+                    bg: '#1e1e1e',
+                    text: '#f0f0f0',
+                    font: "'Oswald', sans-serif",
+                    radius: '0.05',
+                    shadow: '0 2px 4px rgba(0,0,0,0.6)', 
+                    line: 'rgba(255, 255, 255, 0.1)',
+                    glow: 'none'
                 }
             };
             
@@ -325,6 +334,8 @@ class FlipClockCard extends HTMLElement {
 
             const style = document.createElement('style');
             style.textContent = `
+                @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
+                
                 :host {
                     display: block;
                     --card-size: ${sanitizedCardSize}px;

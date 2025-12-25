@@ -1,0 +1,170 @@
+title: Flip Clock Card Gallery
+views:
+  - title: All Themes
+    path: all-themes
+    icon: mdi:clock-digital
+    cards:
+      - type: markdown
+        content: |
+          # 🎨 Flip Clock Themes Gallery
+          A complete showcase of all available themes in `flip-clock-card`.
+
+      # --- ROW 1: Modern & Clean ---
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: classic
+            show_seconds: true
+            size: 80
+            title: Classic
+          - type: custom:flip-clock-card
+            theme: ios-light
+            show_seconds: true
+            size: 80
+            title: iOS Light
+          - type: custom:flip-clock-card
+            theme: ios-dark
+            show_seconds: true
+            size: 80
+            title: iOS Dark
+
+      # --- ROW 2: New & Stylish ---
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: aviator
+            show_seconds: true
+            size: 80
+            title: Aviator (New!)
+          - type: custom:flip-clock-card
+            theme: wood
+            show_seconds: true
+            size: 80
+            title: Wood
+          - type: custom:flip-clock-card
+            theme: e-ink
+            show_seconds: true
+            size: 80
+            title: E-Ink
+
+      # --- ROW 3: Glowing & Retro ---
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: neon
+            show_seconds: true
+            size: 80
+            title: Neon
+          - type: custom:flip-clock-card
+            theme: synthwave
+            show_seconds: true
+            size: 80
+            title: Synthwave
+          - type: custom:flip-clock-card
+            theme: terminal
+            show_seconds: true
+            size: 80
+            title: Terminal
+
+      # --- ROW 4: Sci-Fi / Trek ---
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: trek-orange
+            show_seconds: true
+            size: 80
+            title: LCARS Orange
+          - type: custom:flip-clock-card
+            theme: trek-blue
+            show_seconds: true
+            size: 80
+            title: LCARS Blue
+          - type: custom:flip-clock-card
+            theme: borg
+            show_seconds: true
+            size: 80
+            title: Borg
+
+  - title: Sizes & Configs
+    path: configs
+    icon: mdi:ruler
+    cards:
+      - type: markdown
+        content: |
+          # 📏 Sizes & Configurations
+          Examples of different sizes, speeds, and formats.
+
+      - type: markdown
+        content: "### 1. Different Sizes (40px vs 150px)"
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: classic
+            size: 40
+            show_seconds: true
+          - type: custom:flip-clock-card
+            theme: classic
+            size: 150
+            show_seconds: true
+
+      - type: markdown
+        content: "### 2. Time Formats (12h vs 24h)"
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: ios-dark
+            time_format: '12'
+            show_seconds: true
+          - type: custom:flip-clock-card
+            theme: ios-dark
+            time_format: '24'
+            show_seconds: true
+
+      - type: markdown
+        content: "### 3. Seconds Display (On vs Off)"
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: aviator
+            show_seconds: true
+          - type: custom:flip-clock-card
+            theme: aviator
+            show_seconds: false
+
+      - type: markdown
+        content: "### 4. Animation Speeds"
+      - type: horizontal-stack
+        cards:
+          - type: custom:flip-clock-card
+            theme: neon
+            animation_speed: 0.2
+            show_seconds: true
+            size: 60
+            # Note: This is fast!
+          - type: custom:flip-clock-card
+            theme: neon
+            animation_speed: 1.5
+            show_seconds: true
+            size: 60
+            # Note: This is slow/mechanical
+
+  - title: Custom Styles
+    path: custom
+    icon: mdi:palette
+    cards:
+      - type: markdown
+        content: |
+          # 🎨 Custom Styles
+          Override any theme using `custom_style`.
+
+      - type: custom:flip-clock-card
+        theme: classic
+        size: 100
+        show_seconds: true
+        custom_style:
+          bg: "#003366"
+          text: "#ffcc00"
+          radius: "0.2"
+          shadow: "0 10px 30px rgba(0, 51, 102, 0.5)"
+          font: "'Arial Black', sans-serif"
+
