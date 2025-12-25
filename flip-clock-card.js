@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.3-beta
+ * Version: 25.0.4-beta
  * A retro-style flip clock card with 3D animations
  */
 class FlipClockCard extends HTMLElement {
@@ -11,7 +11,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.3-beta';
+        this.version = '25.0.4-beta';
     }
 
     /**
@@ -768,6 +768,117 @@ class FlipClockCard extends HTMLElement {
     getCardSize() {
         return 3;
     }
+
+    /**
+     * Configuration stub for Lovelace visual editor
+     */
+    static getStubConfig() {
+        return {
+            size: 100,
+            time_format: '24',
+            show_seconds: false,
+            animation_speed: 0.6,
+            theme: 'classic'
+        };
+    }
+
+    static getConfigElement() {
+        return document.createElement("flip-clock-card-editor");
+    }
 }
+
+// Register the card for Lovelace
+window.customCards = window.customCards || [];
+window.customCards.push({
+    type: "flip-clock-card",
+    name: "Flip Clock Card",
+    preview: true,
+    description: "A retro-style flip clock card with 3D animations"
+});
+
+class FlipClockCardEditor extends HTMLElement {
+    setConfig(config) {
+        this._config = config;
+        this.render();
+    }
+
+    configChanged(newConfig) {
+        const event = new Event("config-changed", {
+            bubbles: true,
+            composed: true
+        });
+        event.detail = { config: newConfig };
+        this.dispatchEvent(event);
+    }
+
+    render() {
+        if (!this._config) return;
+
+        this.innerHTML = `
+            <div class="card-config">
+                <div class="option">
+                    <label class="label">Theme</label>
+                    <select class="value" id="theme">
+                        <option value="classic" ${this._config.theme === 'classic' ? 'selected' : ''}>Classic</option>
+                        <option value="ios-light" ${this._config.theme === 'ios-light' ? 'selected' : ''}>iOS Light</option>
+                        <option value="ios-dark" ${this._config.theme === 'ios-dark' ? 'selected' : ''}>iOS Dark</option>
+                        <option value="neon" ${this._config.theme === 'neon' ? 'selected' : ''}>Neon</option>
+                        <option value="red-stealth" ${this._config.theme === 'red-stealth' ? 'selected' : ''}>Red Stealth</option>
+                        <option value="synthwave" ${this._config.theme === 'synthwave' ? 'selected' : ''}>Synthwave</option>
+                        <option value="e-ink" ${this._config.theme === 'e-ink' ? 'selected' : ''}>E-Ink</option>
+                        <option value="terminal" ${this._config.theme === 'terminal' ? 'selected' : ''}>Terminal</option>
+                        <option value="wood" ${this._config.theme === 'wood' ? 'selected' : ''}>Wood</option>
+                        <option value="trek-orange" ${this._config.theme === 'trek-orange' ? 'selected' : ''}>Trek Orange</option>
+                        <option value="trek-red" ${this._config.theme === 'trek-red' ? 'selected' : ''}>Trek Red</option>
+                        <option value="trek-blue" ${this._config.theme === 'trek-blue' ? 'selected' : ''}>Trek Blue</option>
+                        <option value="borg" ${this._config.theme === 'borg' ? 'selected' : ''}>Borg</option>
+                        <option value="aviator" ${this._config.theme === 'aviator' ? 'selected' : ''}>Aviator</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">Size (px)</label>
+                    <input type="number" class="value" id="size" value="${this._config.size || 100}">
+                </div>
+                <div class="option">
+                    <label class="label">Animation Speed (s)</label>
+                    <input type="number" step="0.1" class="value" id="animation_speed" value="${this._config.animation_speed || 0.6}">
+                </div>
+                <div class="option">
+                    <label class="label">Time Format</label>
+                    <select class="value" id="time_format">
+                        <option value="24" ${this._config.time_format !== '12' ? 'selected' : ''}>24h</option>
+                        <option value="12" ${this._config.time_format === '12' ? 'selected' : ''}>12h</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">Show Seconds</label>
+                    <input type="checkbox" class="value" id="show_seconds" ${this._config.show_seconds ? 'checked' : ''}>
+                </div>
+                <style>
+                    .card-config { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+                    .option { display: flex; align-items: center; justify-content: space-between; }
+                    .label { font-weight: bold; margin-right: 16px; }
+                    .value { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
+                    input[type="number"], select { width: 150px; }
+                </style>
+            </div>
+        `;
+
+        this.querySelectorAll('.value').forEach(el => {
+            el.addEventListener('change', (e) => {
+                const target = e.target;
+                const prop = target.id;
+                let value = target.value;
+                if (target.type === 'checkbox') value = target.checked;
+                if (target.type === 'number') value = Number(value);
+                
+                const newConfig = { ...this._config, [prop]: value };
+                this.configChanged(newConfig);
+            });
+        });
+    }
+}
+
+customElements.define("flip-clock-card-editor", FlipClockCardEditor);
 
 customElements.define('flip-clock-card', FlipClockCard);

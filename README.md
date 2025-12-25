@@ -45,6 +45,10 @@ I wasn't happy with the static clocks out there, so I made this one. It has a re
 
 ## How to use it 🛠️
 
+### Visual Editor 
+The card fully supports the Lovelace Visual Editor. You can configure most options (theme, size, seconds, format) directly in the UI without touching YAML.
+
+### YAML Configuration
 Setting this up is straightforward. YAML mode, one card, done.
 
 ### 1. Basic setup (quick start)
