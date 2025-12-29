@@ -62,7 +62,46 @@ show_seconds: true      # false to hide seconds
 
 ---
 
-### 2. Animation speed
+### 2. UTC Time Display
+
+Display coordinated universal time instead of local time.
+
+```yaml
+show_utc: true      # Display UTC time instead of local time
+utc_label: 'UTC'    # Label: 'UTC', 'Z', or null (no label)
+```
+
+Options:
+- `show_utc: false` (default) - Show local system time
+- `show_utc: true` - Show UTC time
+- `utc_label: 'UTC'` (default) - Show "UTC" label after time
+- `utc_label: 'Z'` - Show "Z" label (military/aviation style)
+- `utc_label: null` - Show UTC time without label
+
+**Example: UTC with "Z" label**
+
+```yaml
+type: custom:flip-clock-card
+show_utc: true
+utc_label: 'Z'
+show_seconds: true
+theme: aviator
+size: 120
+```
+
+**Example: UTC without label**
+
+```yaml
+type: custom:flip-clock-card
+show_utc: true
+utc_label: null
+show_seconds: false
+theme: terminal
+```
+
+---
+
+### 3. Animation speed
 
 You can control how fast the flip animation runs.
 
@@ -89,7 +128,7 @@ animation_speed: 0.8
 
 ---
 
-### 3. Themes (built-in styles)
+### 4. Themes (built-in styles)
 
 The card comes with several built-in themes that change colors, fonts, shadows and overall vibe.
 
@@ -154,7 +193,7 @@ animation_speed: 0.5
 
 ---
 
-### 4. Custom theme (override built-in styles)
+### 5. Custom theme (override built-in styles)
 
 If the built-in themes aren’t enough, you can take any `theme` as a base and override some or all of its values with `custom_style`.
 
@@ -199,7 +238,7 @@ custom_style:
 
 ---
 
-### 5. Full example (wall tablet)
+### 6. Full example (wall tablet)
 
 ```yaml
 type: custom:flip-clock-card

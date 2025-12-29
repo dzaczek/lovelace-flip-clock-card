@@ -22,4 +22,8 @@ npm-debug.log*
 tmp/
 temp/
 
+# Claude Code guidance files
+CLAUDE.md
+claude.md
+
 

@@ -45,6 +45,34 @@ views:
             theme: neon
             size: 50
             title: Neon
+      - type: markdown
+        content: |
+          ### UTC Time Display
+          Display coordinated universal time with optional labels.
+      - type: grid
+        columns: 1
+        cards:
+          - type: custom:flip-clock-card
+            theme: aviator
+            show_utc: true
+            utc_label: 'UTC'
+            show_seconds: true
+            size: 80
+            title: UTC with "UTC" label
+          - type: custom:flip-clock-card
+            theme: terminal
+            show_utc: true
+            utc_label: 'Z'
+            show_seconds: true
+            size: 80
+            title: UTC with "Z" label
+          - type: custom:flip-clock-card
+            theme: neon
+            show_utc: true
+            utc_label: null
+            show_seconds: true
+            size: 80
+            title: UTC without label
   - title: All Themes
     path: themes
     icon: mdi:palette

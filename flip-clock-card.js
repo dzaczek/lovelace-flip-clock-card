@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.4
+ * Version: 25.1.0
  * A retro-style flip clock card with 3D animations
  */
 class FlipClockCard extends HTMLElement {
@@ -11,7 +11,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.4';
+        this.version = '25.1.0';
     }
 
     /**
@@ -70,6 +70,18 @@ class FlipClockCard extends HTMLElement {
             return defaultValue;
         }
         return num;
+    }
+
+    /**
+     * Sanitize text content for safe rendering
+     * @param {string} text - Text to sanitize
+     * @returns {string} - Sanitized text
+     */
+    sanitizeText(text) {
+        if (typeof text !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**
@@ -140,7 +152,20 @@ class FlipClockCard extends HTMLElement {
             
             // Validate show_seconds (boolean)
             this.show_seconds = config?.show_seconds === true || config?.show_seconds === 'true';
-            
+
+            // Validate show_utc (boolean)
+            this.show_utc = config?.show_utc === true || config?.show_utc === 'true';
+
+            // Validate and sanitize utc_label
+            if (config?.utc_label !== undefined) {
+                const validLabels = ['UTC', 'Z', null];
+                this.utc_label = validLabels.includes(config.utc_label)
+                    ? config.utc_label
+                    : 'UTC';
+            } else {
+                this.utc_label = 'UTC';
+            }
+
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
             
@@ -168,6 +193,8 @@ class FlipClockCard extends HTMLElement {
             this.card_size = 100;
             this.time_format = '24';
             this.show_seconds = false;
+            this.show_utc = false;
+            this.utc_label = 'UTC';
             this.anim_speed = 0.6;
             this.theme = 'classic';
             this.custom_style = null;
@@ -374,6 +401,21 @@ class FlipClockCard extends HTMLElement {
                     ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
                 }
 
+                .utc-label {
+                    font-size: calc(var(--card-size) * 0.35);
+                    color: var(--flip-text);
+                    margin-left: calc(var(--card-size) * 0.25);
+                    font-weight: 600;
+                    font-family: var(--flip-font);
+                    text-shadow: var(--flip-glow);
+                    padding-top: calc(var(--card-size) * 0.35);
+                    opacity: 0.85;
+                    letter-spacing: 0.05em;
+
+                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.7;` : ''}
+                    ${this.theme === 'borg' ? `text-shadow: 0 0 6px ${sanitizedText};` : ''}
+                }
+
                 .flip-unit {
                     position: relative;
                     width: calc(var(--card-size) * 0.7);
@@ -515,6 +557,11 @@ class FlipClockCard extends HTMLElement {
                 `;
             }
 
+            // Add UTC label
+            if (this.show_utc && this.utc_label) {
+                html += `<div class="utc-label">${this.sanitizeText(this.utc_label)}</div>`;
+            }
+
             container.innerHTML = html;
             this.shadowRoot.innerHTML = ''; 
                 this.shadowRoot.appendChild(style);
@@ -572,13 +619,24 @@ class FlipClockCard extends HTMLElement {
         const update = () => {
             try {
                 const now = new Date();
-                let h = now.getHours();
-                // 12-hour format logic
+                let h, m, s;
+
+                if (this.show_utc) {
+                    h = now.getUTCHours();
+                    m = now.getUTCMinutes();
+                    s = now.getUTCSeconds();
+                } else {
+                    h = now.getHours();
+                    m = now.getMinutes();
+                    s = now.getSeconds();
+                }
+
+                // 12-hour format logic (applies to both local and UTC)
                 if (this.time_format === '12') h = h % 12 || 12;
-                
+
                 const hStr = String(h).padStart(2, '0');
-                const mStr = String(now.getMinutes()).padStart(2, '0');
-                const sStr = String(now.getSeconds()).padStart(2, '0');
+                const mStr = String(m).padStart(2, '0');
+                const sStr = String(s).padStart(2, '0');
                 
                 this.updateDigit('h1', hStr[0]);
                 this.updateDigit('h2', hStr[1]);
@@ -778,7 +836,9 @@ class FlipClockCard extends HTMLElement {
             time_format: '24',
             show_seconds: false,
             animation_speed: 0.6,
-            theme: 'classic'
+            theme: 'classic',
+            show_utc: false,
+            utc_label: 'UTC'
         };
     }
 
@@ -854,6 +914,18 @@ class FlipClockCardEditor extends HTMLElement {
                     <label class="label">Show Seconds</label>
                     <input type="checkbox" class="value" id="show_seconds" ${this._config.show_seconds ? 'checked' : ''}>
                 </div>
+                <div class="option">
+                    <label class="label">Show UTC Time</label>
+                    <input type="checkbox" class="value" id="show_utc" ${this._config.show_utc ? 'checked' : ''}>
+                </div>
+                <div class="option">
+                    <label class="label">UTC Label</label>
+                    <select class="value" id="utc_label">
+                        <option value="UTC" ${(!this._config.utc_label || this._config.utc_label === 'UTC') ? 'selected' : ''}>UTC</option>
+                        <option value="Z" ${this._config.utc_label === 'Z' ? 'selected' : ''}>Z</option>
+                        <option value="null" ${this._config.utc_label === null ? 'selected' : ''}>None</option>
+                    </select>
+                </div>
                 <style>
                     .card-config { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
                     .option { display: flex; align-items: center; justify-content: space-between; }
@@ -871,7 +943,12 @@ class FlipClockCardEditor extends HTMLElement {
                 let value = target.value;
                 if (target.type === 'checkbox') value = target.checked;
                 if (target.type === 'number') value = Number(value);
-                
+
+                // Special handling for utc_label
+                if (prop === 'utc_label' && value === 'null') {
+                    value = null;
+                }
+
                 const newConfig = { ...this._config, [prop]: value };
                 this.configChanged(newConfig);
             });
