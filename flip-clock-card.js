@@ -1,7 +1,8 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.0-alpha
+ * Version: 25.2.2-beta
  * A retro-style flip clock card with 3D animations
+ * New: Added label_size parameter (20-100% of card size)
  * New: Removed show_utc/utc_label, added show_label & label_position
  * New: Multiple timezone label variants per timezone
  * New: Label positioning (right, left, top, bottom, right-vertical)
@@ -15,7 +16,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.2.0-alpha';
+        this.version = '25.2.2-beta';
     }
 
     /**
@@ -183,6 +184,9 @@ class FlipClockCard extends HTMLElement {
                 ? config.label_position 
                 : 'right';
 
+            // Validate label_size (percentage of card size: 20-100)
+            this.label_size = this.validateNumber(config?.label_size, 20, 100, 35);
+
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
             
@@ -217,6 +221,7 @@ class FlipClockCard extends HTMLElement {
             this.timezone_label = null;
             this.show_label = false;
             this.label_position = 'right';
+            this.label_size = 35;
             if (this.debug) {
                 console.error("FlipClockCard: Configuration error:", error);
             }
@@ -392,7 +397,8 @@ class FlipClockCard extends HTMLElement {
                     --flip-shadow: ${sanitizedShadow};
                     --flip-line: ${sanitizedLine};
                     --flip-glow: ${sanitizedGlow};
-                    --half-speed: ${sanitizedHalfSpeed}s; 
+                    --half-speed: ${sanitizedHalfSpeed}s;
+                    --label-size: ${this.validateNumber(this.label_size, 20, 100, 35)}; 
                 }
                 .clock-container {
                     display: flex;
@@ -427,7 +433,7 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 .timezone-label {
-                    font-size: calc(var(--card-size) * 0.35);
+                    font-size: calc(var(--card-size) * var(--label-size) / 100);
                     color: var(--flip-text);
                     font-weight: 600;
                     font-family: var(--flip-font);
@@ -452,12 +458,10 @@ class FlipClockCard extends HTMLElement {
 
                 .timezone-label.position-top {
                     margin-bottom: calc(var(--card-size) * 0.15);
-                    font-size: calc(var(--card-size) * 0.3);
                 }
 
                 .timezone-label.position-bottom {
                     margin-top: calc(var(--card-size) * 0.15);
-                    font-size: calc(var(--card-size) * 0.3);
                 }
 
                 .timezone-label.position-right-vertical {
@@ -939,7 +943,8 @@ class FlipClockCard extends HTMLElement {
             theme: 'classic',
             timezone: null,
             show_label: false,
-            label_position: 'right'
+            label_position: 'right',
+            label_size: 35
         };
     }
 
@@ -1039,6 +1044,10 @@ class FlipClockCardEditor extends HTMLElement {
                         <option value="bottom" ${this._config.label_position === 'bottom' ? 'selected' : ''}>Bottom</option>
                         <option value="right-vertical" ${this._config.label_position === 'right-vertical' ? 'selected' : ''}>Right (Vertical)</option>
                     </select>
+                </div>
+                <div class="option">
+                    <label class="label">Label Size (%)</label>
+                    <input type="number" min="20" max="100" step="5" class="value" id="label_size" value="${this._config.label_size || 35}">
                 </div>
                 <div class="option">
                     <label class="label">Timezone</label>

@@ -73,6 +73,7 @@ timezone:
   label: 'NYC'                # Label to display (optional)
 show_label: true               # Show/hide the timezone label
 label_position: 'right'        # Position: right, left, top, bottom, right-vertical
+label_size: 35                 # Label size as % of card size (20-100, default: 35)
 ```
 
 #### Timezone Options
@@ -115,6 +116,15 @@ label_position: 'right'         # Position of the label
 - `bottom` - Label below the clock
 - `right-vertical` - Vertical label on the right side
 
+**Label Size:**
+- Control the size of the timezone label relative to the card size
+- Value: `20` to `100` (percentage of card size)
+- Default: `35` (35% of card size)
+- Examples:
+  - `label_size: 25` - Small, subtle label
+  - `label_size: 35` - Default size
+  - `label_size: 50` - Large, prominent label
+
 **Example: UTC with vertical "Z" label**
 
 ```yaml
@@ -124,6 +134,7 @@ timezone:
   label: 'Z'
 show_label: true
 label_position: 'right-vertical'
+label_size: 40
 show_seconds: true
 theme: aviator
 size: 120
@@ -358,6 +369,7 @@ All user inputs are validated and sanitized:
 - **`timezone`**: IANA timezone identifier or object with value and label (default: `null` for local time)
 - **`show_label`**: Boolean value (default: `false`)
 - **`label_position`**: Must be one of: `'right'`, `'left'`, `'top'`, `'bottom'`, `'right-vertical'` (default: `'right'`)
+- **`label_size`**: Must be a number between 20 and 100 (default: `35`)
 - **`theme`**: Must be one of the predefined theme names (default: `'classic'`)
 - **`custom_style`**: All CSS values are sanitized:
   - Colors are validated against CSS color formats (hex, rgb, rgba, hsl, named colors)

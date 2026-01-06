@@ -2,14 +2,14 @@
 
 ## Branch Strategy
 
-- **`beta`** - Branch dla wersji beta/testowych. Tutaj testujemy nowe funkcje przed merge do master
-- **`main`/`master`** - Branch produkcyjny, tylko stabilne wersje
+- **`beta`** - Branch for beta/testing versions. We test new features here before merging to master
+- **`main`/`master`** - Production branch, stable versions only
 
 ## Creating a Beta Release
 
 ### Automatic (Recommended)
 
-1. **Upewnij się że jesteś na branch beta:**
+1. **Make sure you're on beta branch:**
    ```bash
    git checkout beta
    ```
@@ -26,16 +26,16 @@
    ```
 
 3. **CI/CD will automatically:**
-   - **GitHub Actions**: Automatycznie zbuduje paczkę i utworzy release na GitHub
-   - **GitLab CI**: Zbuduje paczkę (jeśli używasz GitLab)
-   - Artifacts będą dostępne w Actions/Releases
+   - **GitHub Actions**: Automatically builds the package and creates a release on GitHub
+   - **GitLab CI**: Builds the package (if using GitLab)
+   - Artifacts will be available in Actions/Releases
 
-4. **GitHub Release (automatyczny):**
-   - Release zostanie utworzony automatycznie przez GitHub Actions
-   - Zawiera paczki: `.zip` i `.tar.gz`
-   - Oznaczony jako "pre-release" (beta)
+4. **GitHub Release (automatic):**
+   - Release will be created automatically by GitHub Actions
+   - Contains packages: `.zip` and `.tar.gz`
+   - Marked as "pre-release" (beta)
 
-5. **GitLab Release (manual, jeśli używasz GitLab):**
+5. **GitLab Release (manual, if using GitLab):**
    - Go to **Repository > Releases** in GitLab
    - Click **New release**
    - Select tag: `v25.0.1-beta`
@@ -67,32 +67,32 @@ After creating the release:
 3. Paste your repository URL: `https://github.com/dzaczek/lovelace-flip-clock-card`
 4. Choose **Lovelace** as the category
 5. Click **Add**, then install
-6. Select version `v25.0.1-beta` from the releases (lub wybierz branch `beta`)
+6. Select version `v25.0.1-beta` from the releases (or select `beta` branch)
 
 ## Workflow: Beta → Master
 
-1. **Testowanie na branch beta:**
+1. **Testing on beta branch:**
    ```bash
    git checkout beta
-   # ... wprowadź zmiany ...
+   # ... make changes ...
    git commit -m "Feature: ..."
    git push origin beta
    ```
 
-2. **Utwórz beta release:**
+2. **Create beta release:**
    ```bash
    git tag -a v25.0.1-beta -m "Beta release"
    git push origin v25.0.1-beta
    ```
 
-3. **Po testach, merge do master:**
+3. **After testing, merge to master:**
    ```bash
    git checkout main
    git merge beta
    git push origin main
    ```
 
-4. **Utwórz stabilny release:**
+4. **Create stable release:**
    ```bash
    git tag -a v25.0.1 -m "Stable release"
    git push origin v25.0.1
