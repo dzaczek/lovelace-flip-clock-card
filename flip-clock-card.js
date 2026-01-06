@@ -1,7 +1,8 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.1.1-beta.1
+ * Version: 25.1.2-alpha
  * A retro-style flip clock card with 3D animations
+ * New: Added timezone selector with all world timezones
  * Fix: Prevent duplicate custom element registration in HA 25.x
  */
 class FlipClockCard extends HTMLElement {
@@ -12,7 +13,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.1.1-beta.1';
+        this.version = '25.1.2-alpha';
     }
 
     /**
@@ -167,6 +168,9 @@ class FlipClockCard extends HTMLElement {
                 this.utc_label = 'UTC';
             }
 
+            // Validate timezone (IANA timezone identifier)
+            this.timezone = config?.timezone || null;
+
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
             
@@ -199,6 +203,7 @@ class FlipClockCard extends HTMLElement {
             this.anim_speed = 0.6;
             this.theme = 'classic';
             this.custom_style = null;
+            this.timezone = null;
             if (this.debug) {
                 console.error("FlipClockCard: Configuration error:", error);
             }
@@ -622,7 +627,31 @@ class FlipClockCard extends HTMLElement {
                 const now = new Date();
                 let h, m, s;
 
-                if (this.show_utc) {
+                // Priority: timezone > show_utc > local time
+                if (this.timezone) {
+                    // Use specified timezone
+                    try {
+                        const formatter = new Intl.DateTimeFormat('en-US', {
+                            timeZone: this.timezone,
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            second: 'numeric',
+                            hour12: false
+                        });
+                        const parts = formatter.formatToParts(now);
+                        h = parseInt(parts.find(p => p.type === 'hour').value);
+                        m = parseInt(parts.find(p => p.type === 'minute').value);
+                        s = parseInt(parts.find(p => p.type === 'second').value);
+                    } catch (tzError) {
+                        // Fallback to local time if timezone is invalid
+                        if (this.debug) {
+                            console.error("FlipClockCard: Invalid timezone, falling back to local time:", tzError);
+                        }
+                        h = now.getHours();
+                        m = now.getMinutes();
+                        s = now.getSeconds();
+                    }
+                } else if (this.show_utc) {
                     h = now.getUTCHours();
                     m = now.getUTCMinutes();
                     s = now.getUTCSeconds();
@@ -839,7 +868,8 @@ class FlipClockCard extends HTMLElement {
             animation_speed: 0.6,
             theme: 'classic',
             show_utc: false,
-            utc_label: 'UTC'
+            utc_label: 'UTC',
+            timezone: null
         };
     }
 
@@ -927,12 +957,128 @@ class FlipClockCardEditor extends HTMLElement {
                         <option value="null" ${this._config.utc_label === null ? 'selected' : ''}>None</option>
                     </select>
                 </div>
+                <div class="option">
+                    <label class="label">Timezone</label>
+                    <select class="value" id="timezone">
+                        <option value="null" ${!this._config.timezone ? 'selected' : ''}>Local Time</option>
+                        <optgroup label="UTC">
+                            <option value="UTC" ${this._config.timezone === 'UTC' ? 'selected' : ''}>UTC</option>
+                        </optgroup>
+                        <optgroup label="Africa">
+                            <option value="Africa/Abidjan" ${this._config.timezone === 'Africa/Abidjan' ? 'selected' : ''}>Abidjan</option>
+                            <option value="Africa/Accra" ${this._config.timezone === 'Africa/Accra' ? 'selected' : ''}>Accra</option>
+                            <option value="Africa/Addis_Ababa" ${this._config.timezone === 'Africa/Addis_Ababa' ? 'selected' : ''}>Addis Ababa</option>
+                            <option value="Africa/Algiers" ${this._config.timezone === 'Africa/Algiers' ? 'selected' : ''}>Algiers</option>
+                            <option value="Africa/Cairo" ${this._config.timezone === 'Africa/Cairo' ? 'selected' : ''}>Cairo</option>
+                            <option value="Africa/Casablanca" ${this._config.timezone === 'Africa/Casablanca' ? 'selected' : ''}>Casablanca</option>
+                            <option value="Africa/Johannesburg" ${this._config.timezone === 'Africa/Johannesburg' ? 'selected' : ''}>Johannesburg</option>
+                            <option value="Africa/Lagos" ${this._config.timezone === 'Africa/Lagos' ? 'selected' : ''}>Lagos</option>
+                            <option value="Africa/Nairobi" ${this._config.timezone === 'Africa/Nairobi' ? 'selected' : ''}>Nairobi</option>
+                            <option value="Africa/Tunis" ${this._config.timezone === 'Africa/Tunis' ? 'selected' : ''}>Tunis</option>
+                        </optgroup>
+                        <optgroup label="America - North">
+                            <option value="America/Anchorage" ${this._config.timezone === 'America/Anchorage' ? 'selected' : ''}>Anchorage</option>
+                            <option value="America/Chicago" ${this._config.timezone === 'America/Chicago' ? 'selected' : ''}>Chicago</option>
+                            <option value="America/Denver" ${this._config.timezone === 'America/Denver' ? 'selected' : ''}>Denver</option>
+                            <option value="America/Los_Angeles" ${this._config.timezone === 'America/Los_Angeles' ? 'selected' : ''}>Los Angeles</option>
+                            <option value="America/Mexico_City" ${this._config.timezone === 'America/Mexico_City' ? 'selected' : ''}>Mexico City</option>
+                            <option value="America/New_York" ${this._config.timezone === 'America/New_York' ? 'selected' : ''}>New York</option>
+                            <option value="America/Phoenix" ${this._config.timezone === 'America/Phoenix' ? 'selected' : ''}>Phoenix</option>
+                            <option value="America/Toronto" ${this._config.timezone === 'America/Toronto' ? 'selected' : ''}>Toronto</option>
+                            <option value="America/Vancouver" ${this._config.timezone === 'America/Vancouver' ? 'selected' : ''}>Vancouver</option>
+                        </optgroup>
+                        <optgroup label="America - South & Central">
+                            <option value="America/Argentina/Buenos_Aires" ${this._config.timezone === 'America/Argentina/Buenos_Aires' ? 'selected' : ''}>Buenos Aires</option>
+                            <option value="America/Bogota" ${this._config.timezone === 'America/Bogota' ? 'selected' : ''}>Bogota</option>
+                            <option value="America/Caracas" ${this._config.timezone === 'America/Caracas' ? 'selected' : ''}>Caracas</option>
+                            <option value="America/Lima" ${this._config.timezone === 'America/Lima' ? 'selected' : ''}>Lima</option>
+                            <option value="America/Santiago" ${this._config.timezone === 'America/Santiago' ? 'selected' : ''}>Santiago</option>
+                            <option value="America/Sao_Paulo" ${this._config.timezone === 'America/Sao_Paulo' ? 'selected' : ''}>São Paulo</option>
+                        </optgroup>
+                        <optgroup label="Asia - East">
+                            <option value="Asia/Bangkok" ${this._config.timezone === 'Asia/Bangkok' ? 'selected' : ''}>Bangkok</option>
+                            <option value="Asia/Hong_Kong" ${this._config.timezone === 'Asia/Hong_Kong' ? 'selected' : ''}>Hong Kong</option>
+                            <option value="Asia/Jakarta" ${this._config.timezone === 'Asia/Jakarta' ? 'selected' : ''}>Jakarta</option>
+                            <option value="Asia/Kuala_Lumpur" ${this._config.timezone === 'Asia/Kuala_Lumpur' ? 'selected' : ''}>Kuala Lumpur</option>
+                            <option value="Asia/Manila" ${this._config.timezone === 'Asia/Manila' ? 'selected' : ''}>Manila</option>
+                            <option value="Asia/Seoul" ${this._config.timezone === 'Asia/Seoul' ? 'selected' : ''}>Seoul</option>
+                            <option value="Asia/Shanghai" ${this._config.timezone === 'Asia/Shanghai' ? 'selected' : ''}>Shanghai</option>
+                            <option value="Asia/Singapore" ${this._config.timezone === 'Asia/Singapore' ? 'selected' : ''}>Singapore</option>
+                            <option value="Asia/Taipei" ${this._config.timezone === 'Asia/Taipei' ? 'selected' : ''}>Taipei</option>
+                            <option value="Asia/Tokyo" ${this._config.timezone === 'Asia/Tokyo' ? 'selected' : ''}>Tokyo</option>
+                        </optgroup>
+                        <optgroup label="Asia - Middle East & Central">
+                            <option value="Asia/Dubai" ${this._config.timezone === 'Asia/Dubai' ? 'selected' : ''}>Dubai</option>
+                            <option value="Asia/Jerusalem" ${this._config.timezone === 'Asia/Jerusalem' ? 'selected' : ''}>Jerusalem</option>
+                            <option value="Asia/Karachi" ${this._config.timezone === 'Asia/Karachi' ? 'selected' : ''}>Karachi</option>
+                            <option value="Asia/Kolkata" ${this._config.timezone === 'Asia/Kolkata' ? 'selected' : ''}>Kolkata</option>
+                            <option value="Asia/Riyadh" ${this._config.timezone === 'Asia/Riyadh' ? 'selected' : ''}>Riyadh</option>
+                            <option value="Asia/Tehran" ${this._config.timezone === 'Asia/Tehran' ? 'selected' : ''}>Tehran</option>
+                        </optgroup>
+                        <optgroup label="Asia - Siberia & Far East">
+                            <option value="Asia/Vladivostok" ${this._config.timezone === 'Asia/Vladivostok' ? 'selected' : ''}>Vladivostok</option>
+                            <option value="Asia/Yakutsk" ${this._config.timezone === 'Asia/Yakutsk' ? 'selected' : ''}>Yakutsk</option>
+                            <option value="Asia/Yekaterinburg" ${this._config.timezone === 'Asia/Yekaterinburg' ? 'selected' : ''}>Yekaterinburg</option>
+                        </optgroup>
+                        <optgroup label="Atlantic">
+                            <option value="Atlantic/Azores" ${this._config.timezone === 'Atlantic/Azores' ? 'selected' : ''}>Azores</option>
+                            <option value="Atlantic/Cape_Verde" ${this._config.timezone === 'Atlantic/Cape_Verde' ? 'selected' : ''}>Cape Verde</option>
+                            <option value="Atlantic/Reykjavik" ${this._config.timezone === 'Atlantic/Reykjavik' ? 'selected' : ''}>Reykjavik</option>
+                        </optgroup>
+                        <optgroup label="Australia & Pacific">
+                            <option value="Australia/Adelaide" ${this._config.timezone === 'Australia/Adelaide' ? 'selected' : ''}>Adelaide</option>
+                            <option value="Australia/Brisbane" ${this._config.timezone === 'Australia/Brisbane' ? 'selected' : ''}>Brisbane</option>
+                            <option value="Australia/Darwin" ${this._config.timezone === 'Australia/Darwin' ? 'selected' : ''}>Darwin</option>
+                            <option value="Australia/Melbourne" ${this._config.timezone === 'Australia/Melbourne' ? 'selected' : ''}>Melbourne</option>
+                            <option value="Australia/Perth" ${this._config.timezone === 'Australia/Perth' ? 'selected' : ''}>Perth</option>
+                            <option value="Australia/Sydney" ${this._config.timezone === 'Australia/Sydney' ? 'selected' : ''}>Sydney</option>
+                            <option value="Pacific/Auckland" ${this._config.timezone === 'Pacific/Auckland' ? 'selected' : ''}>Auckland</option>
+                            <option value="Pacific/Fiji" ${this._config.timezone === 'Pacific/Fiji' ? 'selected' : ''}>Fiji</option>
+                            <option value="Pacific/Guam" ${this._config.timezone === 'Pacific/Guam' ? 'selected' : ''}>Guam</option>
+                            <option value="Pacific/Honolulu" ${this._config.timezone === 'Pacific/Honolulu' ? 'selected' : ''}>Honolulu</option>
+                            <option value="Pacific/Tahiti" ${this._config.timezone === 'Pacific/Tahiti' ? 'selected' : ''}>Tahiti</option>
+                        </optgroup>
+                        <optgroup label="Europe - West">
+                            <option value="Europe/Dublin" ${this._config.timezone === 'Europe/Dublin' ? 'selected' : ''}>Dublin</option>
+                            <option value="Europe/Lisbon" ${this._config.timezone === 'Europe/Lisbon' ? 'selected' : ''}>Lisbon</option>
+                            <option value="Europe/London" ${this._config.timezone === 'Europe/London' ? 'selected' : ''}>London</option>
+                        </optgroup>
+                        <optgroup label="Europe - Central">
+                            <option value="Europe/Amsterdam" ${this._config.timezone === 'Europe/Amsterdam' ? 'selected' : ''}>Amsterdam</option>
+                            <option value="Europe/Berlin" ${this._config.timezone === 'Europe/Berlin' ? 'selected' : ''}>Berlin</option>
+                            <option value="Europe/Brussels" ${this._config.timezone === 'Europe/Brussels' ? 'selected' : ''}>Brussels</option>
+                            <option value="Europe/Copenhagen" ${this._config.timezone === 'Europe/Copenhagen' ? 'selected' : ''}>Copenhagen</option>
+                            <option value="Europe/Madrid" ${this._config.timezone === 'Europe/Madrid' ? 'selected' : ''}>Madrid</option>
+                            <option value="Europe/Oslo" ${this._config.timezone === 'Europe/Oslo' ? 'selected' : ''}>Oslo</option>
+                            <option value="Europe/Paris" ${this._config.timezone === 'Europe/Paris' ? 'selected' : ''}>Paris</option>
+                            <option value="Europe/Prague" ${this._config.timezone === 'Europe/Prague' ? 'selected' : ''}>Prague</option>
+                            <option value="Europe/Rome" ${this._config.timezone === 'Europe/Rome' ? 'selected' : ''}>Rome</option>
+                            <option value="Europe/Stockholm" ${this._config.timezone === 'Europe/Stockholm' ? 'selected' : ''}>Stockholm</option>
+                            <option value="Europe/Vienna" ${this._config.timezone === 'Europe/Vienna' ? 'selected' : ''}>Vienna</option>
+                            <option value="Europe/Warsaw" ${this._config.timezone === 'Europe/Warsaw' ? 'selected' : ''}>Warsaw</option>
+                            <option value="Europe/Zurich" ${this._config.timezone === 'Europe/Zurich' ? 'selected' : ''}>Zurich</option>
+                        </optgroup>
+                        <optgroup label="Europe - East">
+                            <option value="Europe/Athens" ${this._config.timezone === 'Europe/Athens' ? 'selected' : ''}>Athens</option>
+                            <option value="Europe/Bucharest" ${this._config.timezone === 'Europe/Bucharest' ? 'selected' : ''}>Bucharest</option>
+                            <option value="Europe/Helsinki" ${this._config.timezone === 'Europe/Helsinki' ? 'selected' : ''}>Helsinki</option>
+                            <option value="Europe/Istanbul" ${this._config.timezone === 'Europe/Istanbul' ? 'selected' : ''}>Istanbul</option>
+                            <option value="Europe/Kiev" ${this._config.timezone === 'Europe/Kiev' ? 'selected' : ''}>Kiev</option>
+                            <option value="Europe/Moscow" ${this._config.timezone === 'Europe/Moscow' ? 'selected' : ''}>Moscow</option>
+                            <option value="Europe/Riga" ${this._config.timezone === 'Europe/Riga' ? 'selected' : ''}>Riga</option>
+                            <option value="Europe/Sofia" ${this._config.timezone === 'Europe/Sofia' ? 'selected' : ''}>Sofia</option>
+                            <option value="Europe/Tallinn" ${this._config.timezone === 'Europe/Tallinn' ? 'selected' : ''}>Tallinn</option>
+                            <option value="Europe/Vilnius" ${this._config.timezone === 'Europe/Vilnius' ? 'selected' : ''}>Vilnius</option>
+                        </optgroup>
+                    </select>
+                </div>
                 <style>
                     .card-config { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
                     .option { display: flex; align-items: center; justify-content: space-between; }
                     .label { font-weight: bold; margin-right: 16px; }
                     .value { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
                     input[type="number"], select { width: 150px; }
+                    select#timezone { width: 200px; }
                 </style>
             </div>
         `;
@@ -945,8 +1091,8 @@ class FlipClockCardEditor extends HTMLElement {
                 if (target.type === 'checkbox') value = target.checked;
                 if (target.type === 'number') value = Number(value);
 
-                // Special handling for utc_label
-                if (prop === 'utc_label' && value === 'null') {
+                // Special handling for utc_label and timezone
+                if ((prop === 'utc_label' || prop === 'timezone') && value === 'null') {
                     value = null;
                 }
 

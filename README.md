@@ -9,11 +9,12 @@ I wasn't happy with the static clocks out there, so I made this one. It has a re
 
 ## Why you might want this
 
-* **It moves!** The cards actually flip down. It’s weirdly satisfying to watch.
-* **No bloat.** It’s just pure CSS and JS. No heavy libraries attached.
+* **It moves!** The cards actually flip down. It's weirdly satisfying to watch.
+* **No bloat.** It's just pure CSS and JS. No heavy libraries attached.
 * **Customizable.** Make it huge, make it tiny  your call.
 * **12h / 24h.** Whether you like AM/PM or military time, I got you covered.
 * **Seconds.** You can show them if you want to see time fly by.
+* **World Timezones.** Display time in any timezone - from Tokyo to New York, with 100+ cities!
 * **Themed.** Comes with built-in styles like Star Trek, Apple style, neon, and a few nerdy ones.
 
 ---
@@ -101,7 +102,84 @@ theme: terminal
 
 ---
 
-### 3. Animation speed
+### 3. Timezone Selector 🌍
+
+Display time in any timezone in the world! Choose from over 100 major cities and regions.
+
+```yaml
+timezone: 'America/New_York'   # IANA timezone identifier
+```
+
+**Priority**: When both `timezone` and `show_utc` are set, `timezone` takes precedence.
+
+Options:
+- `timezone: null` (default) - Show local system time
+- `timezone: 'UTC'` - Show UTC time
+- `timezone: 'Europe/Warsaw'` - Warsaw time (GMT+1/+2 with DST)
+- `timezone: 'America/New_York'` - New York time (GMT-5/-4 with DST)
+- `timezone: 'Asia/Tokyo'` - Tokyo time (GMT+9)
+- ... and many more!
+
+The card includes a comprehensive timezone selector with regions organized by:
+- **Africa**: Cairo, Johannesburg, Lagos, Nairobi, etc.
+- **Americas**: New York, Los Angeles, Chicago, São Paulo, Buenos Aires, etc.
+- **Asia**: Tokyo, Hong Kong, Dubai, Singapore, Bangkok, etc.
+- **Europe**: London, Paris, Berlin, Warsaw, Moscow, etc.
+- **Australia & Pacific**: Sydney, Auckland, Melbourne, Honolulu, etc.
+
+**Example: Tokyo Time**
+
+```yaml
+type: custom:flip-clock-card
+timezone: 'Asia/Tokyo'
+show_seconds: true
+theme: neon
+size: 100
+```
+
+**Example: New York Time**
+
+```yaml
+type: custom:flip-clock-card
+timezone: 'America/New_York'
+show_seconds: false
+theme: ios-dark
+size: 120
+```
+
+**Example: Multiple Timezones**
+
+```yaml
+type: grid
+columns: 2
+cards:
+  - type: custom:flip-clock-card
+    timezone: 'Europe/London'
+    theme: classic
+    size: 80
+    title: London
+  - type: custom:flip-clock-card
+    timezone: 'America/New_York'
+    theme: ios-dark
+    size: 80
+    title: New York
+  - type: custom:flip-clock-card
+    timezone: 'Asia/Tokyo'
+    theme: neon
+    size: 80
+    title: Tokyo
+  - type: custom:flip-clock-card
+    timezone: 'Australia/Sydney'
+    theme: terminal
+    size: 80
+    title: Sydney
+```
+
+**Visual Editor**: The timezone selector is available in the visual editor as a dropdown with all timezones organized by region!
+
+---
+
+### 4. Animation speed
 
 You can control how fast the flip animation runs.
 
@@ -128,7 +206,7 @@ animation_speed: 0.8
 
 ---
 
-### 4. Themes (built-in styles)
+### 5. Themes (built-in styles)
 
 The card comes with several built-in themes that change colors, fonts, shadows and overall vibe.
 
@@ -193,7 +271,7 @@ animation_speed: 0.5
 
 ---
 
-### 5. Custom theme (override built-in styles)
+### 6. Custom theme (override built-in styles)
 
 If the built-in themes aren’t enough, you can take any `theme` as a base and override some or all of its values with `custom_style`.
 
@@ -238,7 +316,7 @@ custom_style:
 
 ---
 
-### 6. Full example (wall tablet)
+### 7. Full example (wall tablet)
 
 ```yaml
 type: custom:flip-clock-card
@@ -278,6 +356,8 @@ All user inputs are validated and sanitized:
 - **`animation_speed`**: Must be a number between 0.1 and 2.0 seconds (default: 0.6)
 - **`time_format`**: Only accepts `'12'` or `'24'` (default: `'24'`)
 - **`show_seconds`**: Boolean value (default: `false`)
+- **`show_utc`**: Boolean value (default: `false`)
+- **`timezone`**: IANA timezone identifier (default: `null` for local time)
 - **`theme`**: Must be one of the predefined theme names (default: `'classic'`)
 - **`custom_style`**: All CSS values are sanitized:
   - Colors are validated against CSS color formats (hex, rgb, rgba, hsl, named colors)
