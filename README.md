@@ -26,7 +26,7 @@ I wasn't happy with the static clocks out there, so I made this one. It has a re
 1. Go to **HACS → Frontend**.
 2. Click the 3 dots (top right) → **Custom repositories**.
 3. Paste the URL of this repo.
-4. Choose **Dasboard** as the category.
+4. Choose **Dashboard** as the category.
 5. Click **Add**, then install. Done.
 
 ### The "I like pain" Way (Manual)
