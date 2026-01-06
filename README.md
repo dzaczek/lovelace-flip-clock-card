@@ -63,123 +63,122 @@ show_seconds: true      # false to hide seconds
 
 ---
 
-### 2. UTC Time Display
+### 2. Timezone Selector 🌍
 
-Display coordinated universal time instead of local time.
+Display time in any timezone in the world! Choose from over 100 major cities and regions, each with multiple label variants.
 
 ```yaml
-show_utc: true      # Display UTC time instead of local time
-utc_label: 'UTC'    # Label: 'UTC', 'Z', or null (no label)
+timezone:
+  value: 'America/New_York'   # IANA timezone identifier
+  label: 'NYC'                # Label to display (optional)
+show_label: true               # Show/hide the timezone label
+label_position: 'right'        # Position: right, left, top, bottom, right-vertical
 ```
 
-Options:
-- `show_utc: false` (default) - Show local system time
-- `show_utc: true` - Show UTC time
-- `utc_label: 'UTC'` (default) - Show "UTC" label after time
-- `utc_label: 'Z'` - Show "Z" label (military/aviation style)
-- `utc_label: null` - Show UTC time without label
+#### Timezone Options
 
-**Example: UTC with "Z" label**
+The timezone can be specified in two formats:
+
+**Simple format (no label):**
+```yaml
+timezone: 'America/New_York'
+```
+
+**Advanced format (with custom label):**
+```yaml
+timezone:
+  value: 'America/New_York'
+  label: 'NYC'
+```
+
+Each timezone has multiple label variants to choose from in the visual editor:
+- **UTC**: UTC, UTC (Z), GMT, GMT+0, ZULU
+- **New York**: New York, NYC, EST/EDT, Eastern Time
+- **London**: London, UK, GMT/BST
+- **Warsaw**: Warsaw, Warszawa, Poland, Polska, CET/CEST
+- **Tokyo**: Tokyo, Japan, JST, Tokyo (GMT+9)
+- ... and many more!
+
+#### Label Display Options
+
+Control label visibility and positioning:
+
+```yaml
+show_label: true                # Show the timezone label (default: false)
+label_position: 'right'         # Position of the label
+```
+
+**Label Positions:**
+- `right` (default) - Horizontal label on the right side
+- `left` - Horizontal label on the left side
+- `top` - Label above the clock
+- `bottom` - Label below the clock
+- `right-vertical` - Vertical label on the right side
+
+**Example: UTC with vertical "Z" label**
 
 ```yaml
 type: custom:flip-clock-card
-show_utc: true
-utc_label: 'Z'
+timezone:
+  value: 'UTC'
+  label: 'Z'
+show_label: true
+label_position: 'right-vertical'
 show_seconds: true
 theme: aviator
 size: 120
 ```
 
-**Example: UTC without label**
+**Example: Tokyo with label on top**
 
 ```yaml
 type: custom:flip-clock-card
-show_utc: true
-utc_label: null
-show_seconds: false
-theme: terminal
-```
-
----
-
-### 3. Timezone Selector 🌍
-
-Display time in any timezone in the world! Choose from over 100 major cities and regions.
-
-```yaml
-timezone: 'America/New_York'   # IANA timezone identifier
-```
-
-**Priority**: When both `timezone` and `show_utc` are set, `timezone` takes precedence.
-
-Options:
-- `timezone: null` (default) - Show local system time
-- `timezone: 'UTC'` - Show UTC time
-- `timezone: 'Europe/Warsaw'` - Warsaw time (GMT+1/+2 with DST)
-- `timezone: 'America/New_York'` - New York time (GMT-5/-4 with DST)
-- `timezone: 'Asia/Tokyo'` - Tokyo time (GMT+9)
-- ... and many more!
-
-The card includes a comprehensive timezone selector with regions organized by:
-- **Africa**: Cairo, Johannesburg, Lagos, Nairobi, etc.
-- **Americas**: New York, Los Angeles, Chicago, São Paulo, Buenos Aires, etc.
-- **Asia**: Tokyo, Hong Kong, Dubai, Singapore, Bangkok, etc.
-- **Europe**: London, Paris, Berlin, Warsaw, Moscow, etc.
-- **Australia & Pacific**: Sydney, Auckland, Melbourne, Honolulu, etc.
-
-**Example: Tokyo Time**
-
-```yaml
-type: custom:flip-clock-card
-timezone: 'Asia/Tokyo'
-show_seconds: true
+timezone:
+  value: 'Asia/Tokyo'
+  label: 'JST'
+show_label: true
+label_position: 'top'
 theme: neon
 size: 100
 ```
 
-**Example: New York Time**
-
-```yaml
-type: custom:flip-clock-card
-timezone: 'America/New_York'
-show_seconds: false
-theme: ios-dark
-size: 120
-```
-
-**Example: Multiple Timezones**
+**Example: Multiple Timezones with different labels**
 
 ```yaml
 type: grid
-columns: 2
+columns: 3
 cards:
   - type: custom:flip-clock-card
-    timezone: 'Europe/London'
+    timezone:
+      value: 'Europe/Warsaw'
+      label: 'Polska'
+    show_label: true
+    label_position: 'bottom'
     theme: classic
     size: 80
-    title: London
   - type: custom:flip-clock-card
-    timezone: 'America/New_York'
+    timezone:
+      value: 'America/New_York'
+      label: 'EST/EDT'
+    show_label: true
+    label_position: 'right'
     theme: ios-dark
     size: 80
-    title: New York
   - type: custom:flip-clock-card
-    timezone: 'Asia/Tokyo'
+    timezone:
+      value: 'Asia/Tokyo'
+      label: 'JST'
+    show_label: true
+    label_position: 'left'
     theme: neon
     size: 80
-    title: Tokyo
-  - type: custom:flip-clock-card
-    timezone: 'Australia/Sydney'
-    theme: terminal
-    size: 80
-    title: Sydney
 ```
 
-**Visual Editor**: The timezone selector is available in the visual editor as a dropdown with all timezones organized by region!
+**Visual Editor**: The timezone selector in the visual editor includes all timezones organized by region, with multiple label variants for each timezone!
 
 ---
 
-### 4. Animation speed
+### 3. Animation speed
 
 You can control how fast the flip animation runs.
 
@@ -206,7 +205,7 @@ animation_speed: 0.8
 
 ---
 
-### 5. Themes (built-in styles)
+### 4. Themes (built-in styles)
 
 The card comes with several built-in themes that change colors, fonts, shadows and overall vibe.
 
@@ -271,7 +270,7 @@ animation_speed: 0.5
 
 ---
 
-### 6. Custom theme (override built-in styles)
+### 5. Custom theme (override built-in styles)
 
 If the built-in themes aren’t enough, you can take any `theme` as a base and override some or all of its values with `custom_style`.
 
@@ -316,7 +315,7 @@ custom_style:
 
 ---
 
-### 7. Full example (wall tablet)
+### 6. Full example (wall tablet)
 
 ```yaml
 type: custom:flip-clock-card
@@ -356,8 +355,9 @@ All user inputs are validated and sanitized:
 - **`animation_speed`**: Must be a number between 0.1 and 2.0 seconds (default: 0.6)
 - **`time_format`**: Only accepts `'12'` or `'24'` (default: `'24'`)
 - **`show_seconds`**: Boolean value (default: `false`)
-- **`show_utc`**: Boolean value (default: `false`)
-- **`timezone`**: IANA timezone identifier (default: `null` for local time)
+- **`timezone`**: IANA timezone identifier or object with value and label (default: `null` for local time)
+- **`show_label`**: Boolean value (default: `false`)
+- **`label_position`**: Must be one of: `'right'`, `'left'`, `'top'`, `'bottom'`, `'right-vertical'` (default: `'right'`)
 - **`theme`**: Must be one of the predefined theme names (default: `'classic'`)
 - **`custom_style`**: All CSS values are sanitized:
   - Colors are validated against CSS color formats (hex, rgb, rgba, hsl, named colors)

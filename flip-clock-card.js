@@ -1,8 +1,10 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.1.2-alpha
+ * Version: 25.2.0-alpha
  * A retro-style flip clock card with 3D animations
- * New: Added timezone selector with all world timezones
+ * New: Removed show_utc/utc_label, added show_label & label_position
+ * New: Multiple timezone label variants per timezone
+ * New: Label positioning (right, left, top, bottom, right-vertical)
  * Fix: Prevent duplicate custom element registration in HA 25.x
  */
 class FlipClockCard extends HTMLElement {
@@ -13,7 +15,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.1.2-alpha';
+        this.version = '25.2.0-alpha';
     }
 
     /**
@@ -155,21 +157,31 @@ class FlipClockCard extends HTMLElement {
             // Validate show_seconds (boolean)
             this.show_seconds = config?.show_seconds === true || config?.show_seconds === 'true';
 
-            // Validate show_utc (boolean)
-            this.show_utc = config?.show_utc === true || config?.show_utc === 'true';
-
-            // Validate and sanitize utc_label
-            if (config?.utc_label !== undefined) {
-                const validLabels = ['UTC', 'Z', null];
-                this.utc_label = validLabels.includes(config.utc_label)
-                    ? config.utc_label
-                    : 'UTC';
+            // Validate timezone (can be IANA identifier or object with timezone and label)
+            if (config?.timezone) {
+                if (typeof config.timezone === 'string') {
+                    this.timezone = config.timezone;
+                    this.timezone_label = null;
+                } else if (typeof config.timezone === 'object' && config.timezone.value) {
+                    this.timezone = config.timezone.value;
+                    this.timezone_label = config.timezone.label || null;
+                } else {
+                    this.timezone = null;
+                    this.timezone_label = null;
+                }
             } else {
-                this.utc_label = 'UTC';
+                this.timezone = null;
+                this.timezone_label = null;
             }
 
-            // Validate timezone (IANA timezone identifier)
-            this.timezone = config?.timezone || null;
+            // Validate show_label (boolean)
+            this.show_label = config?.show_label === true || config?.show_label === 'true';
+
+            // Validate label_position
+            const validPositions = ['right', 'left', 'top', 'bottom', 'right-vertical'];
+            this.label_position = validPositions.includes(config?.label_position) 
+                ? config.label_position 
+                : 'right';
 
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
@@ -198,12 +210,13 @@ class FlipClockCard extends HTMLElement {
             this.card_size = 100;
             this.time_format = '24';
             this.show_seconds = false;
-            this.show_utc = false;
-            this.utc_label = 'UTC';
             this.anim_speed = 0.6;
             this.theme = 'classic';
             this.custom_style = null;
             this.timezone = null;
+            this.timezone_label = null;
+            this.show_label = false;
+            this.label_position = 'right';
             if (this.debug) {
                 console.error("FlipClockCard: Configuration error:", error);
             }
@@ -388,6 +401,12 @@ class FlipClockCard extends HTMLElement {
                     padding: 20px;
                     background: transparent;
                     perspective: 1000px;
+                    flex-direction: ${this.label_position === 'top' || this.label_position === 'bottom' ? 'column' : 'row'};
+                }
+                .clock-wrapper {
+                    display: flex;
+                    align-items: center;
+                    gap: calc(var(--card-size) * 0.15);
                 }
                 .digit-group {
                     display: flex;
@@ -407,19 +426,45 @@ class FlipClockCard extends HTMLElement {
                     ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
                 }
 
-                .utc-label {
+                .timezone-label {
                     font-size: calc(var(--card-size) * 0.35);
                     color: var(--flip-text);
-                    margin-left: calc(var(--card-size) * 0.25);
                     font-weight: 600;
                     font-family: var(--flip-font);
                     text-shadow: var(--flip-glow);
-                    padding-top: calc(var(--card-size) * 0.35);
                     opacity: 0.85;
                     letter-spacing: 0.05em;
 
                     ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.7;` : ''}
                     ${this.theme === 'borg' ? `text-shadow: 0 0 6px ${sanitizedText};` : ''}
+                }
+
+                .timezone-label.position-right {
+                    margin-left: calc(var(--card-size) * 0.25);
+                    padding-top: calc(var(--card-size) * 0.35);
+                }
+
+                .timezone-label.position-left {
+                    margin-right: calc(var(--card-size) * 0.25);
+                    padding-top: calc(var(--card-size) * 0.35);
+                    order: -1;
+                }
+
+                .timezone-label.position-top {
+                    margin-bottom: calc(var(--card-size) * 0.15);
+                    font-size: calc(var(--card-size) * 0.3);
+                }
+
+                .timezone-label.position-bottom {
+                    margin-top: calc(var(--card-size) * 0.15);
+                    font-size: calc(var(--card-size) * 0.3);
+                }
+
+                .timezone-label.position-right-vertical {
+                    margin-left: calc(var(--card-size) * 0.25);
+                    writing-mode: vertical-rl;
+                    text-orientation: mixed;
+                    padding-top: 0;
                 }
 
                 .flip-unit {
@@ -541,7 +586,8 @@ class FlipClockCard extends HTMLElement {
                 </div>
             `;
 
-            let html = `
+            // Build clock HTML
+            let clockHtml = `
                 <div class="digit-group">
                     ${createDigitHtml('h1')}
                     ${createDigitHtml('h2')}
@@ -554,7 +600,7 @@ class FlipClockCard extends HTMLElement {
             `;
 
             if (this.show_seconds) {
-                html += `
+                clockHtml += `
                     <div class="separator">:</div>
                     <div class="digit-group">
                         ${createDigitHtml('s1')}
@@ -563,9 +609,37 @@ class FlipClockCard extends HTMLElement {
                 `;
             }
 
-            // Add UTC label
-            if (this.show_utc && this.utc_label) {
-                html += `<div class="utc-label">${this.sanitizeText(this.utc_label)}</div>`;
+            // Determine label to display
+            const labelText = this.show_label && this.timezone_label ? this.sanitizeText(this.timezone_label) : '';
+
+            // Build final HTML based on label position
+            let html = '';
+            if (this.label_position === 'top' && labelText) {
+                html = `
+                    <div class="timezone-label position-top">${labelText}</div>
+                    <div class="clock-wrapper">${clockHtml}</div>
+                `;
+            } else if (this.label_position === 'bottom' && labelText) {
+                html = `
+                    <div class="clock-wrapper">${clockHtml}</div>
+                    <div class="timezone-label position-bottom">${labelText}</div>
+                `;
+            } else {
+                // left, right, right-vertical
+                html = `<div class="clock-wrapper">${clockHtml}`;
+                if (labelText) {
+                    if (this.label_position === 'left') {
+                        html = `<div class="clock-wrapper">
+                            <div class="timezone-label position-left">${labelText}</div>
+                            ${clockHtml}`;
+                    } else if (this.label_position === 'right-vertical') {
+                        html += `<div class="timezone-label position-right-vertical">${labelText}</div>`;
+                    } else {
+                        // right (default)
+                        html += `<div class="timezone-label position-right">${labelText}</div>`;
+                    }
+                }
+                html += `</div>`;
             }
 
             container.innerHTML = html;
@@ -627,7 +701,7 @@ class FlipClockCard extends HTMLElement {
                 const now = new Date();
                 let h, m, s;
 
-                // Priority: timezone > show_utc > local time
+                // Use timezone if specified, otherwise local time
                 if (this.timezone) {
                     // Use specified timezone
                     try {
@@ -651,17 +725,13 @@ class FlipClockCard extends HTMLElement {
                         m = now.getMinutes();
                         s = now.getSeconds();
                     }
-                } else if (this.show_utc) {
-                    h = now.getUTCHours();
-                    m = now.getUTCMinutes();
-                    s = now.getUTCSeconds();
                 } else {
                     h = now.getHours();
                     m = now.getMinutes();
                     s = now.getSeconds();
                 }
 
-                // 12-hour format logic (applies to both local and UTC)
+                // 12-hour format logic
                 if (this.time_format === '12') h = h % 12 || 12;
 
                 const hStr = String(h).padStart(2, '0');
@@ -867,9 +937,9 @@ class FlipClockCard extends HTMLElement {
             show_seconds: false,
             animation_speed: 0.6,
             theme: 'classic',
-            show_utc: false,
-            utc_label: 'UTC',
-            timezone: null
+            timezone: null,
+            show_label: false,
+            label_position: 'right'
         };
     }
 
@@ -900,6 +970,17 @@ class FlipClockCardEditor extends HTMLElement {
         });
         event.detail = { config: newConfig };
         this.dispatchEvent(event);
+    }
+
+    getTimezoneMatch(value, label) {
+        if (!this._config.timezone) return false;
+        if (typeof this._config.timezone === 'string') {
+            return this._config.timezone === value && !label;
+        }
+        if (typeof this._config.timezone === 'object') {
+            return this._config.timezone.value === value && this._config.timezone.label === label;
+        }
+        return false;
     }
 
     render() {
@@ -946,129 +1027,159 @@ class FlipClockCardEditor extends HTMLElement {
                     <input type="checkbox" class="value" id="show_seconds" ${this._config.show_seconds ? 'checked' : ''}>
                 </div>
                 <div class="option">
-                    <label class="label">Show UTC Time</label>
-                    <input type="checkbox" class="value" id="show_utc" ${this._config.show_utc ? 'checked' : ''}>
+                    <label class="label">Show Label</label>
+                    <input type="checkbox" class="value" id="show_label" ${this._config.show_label ? 'checked' : ''}>
                 </div>
                 <div class="option">
-                    <label class="label">UTC Label</label>
-                    <select class="value" id="utc_label">
-                        <option value="UTC" ${(!this._config.utc_label || this._config.utc_label === 'UTC') ? 'selected' : ''}>UTC</option>
-                        <option value="Z" ${this._config.utc_label === 'Z' ? 'selected' : ''}>Z</option>
-                        <option value="null" ${this._config.utc_label === null ? 'selected' : ''}>None</option>
+                    <label class="label">Label Position</label>
+                    <select class="value" id="label_position">
+                        <option value="right" ${(!this._config.label_position || this._config.label_position === 'right') ? 'selected' : ''}>Right (Horizontal)</option>
+                        <option value="left" ${this._config.label_position === 'left' ? 'selected' : ''}>Left (Horizontal)</option>
+                        <option value="top" ${this._config.label_position === 'top' ? 'selected' : ''}>Top</option>
+                        <option value="bottom" ${this._config.label_position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                        <option value="right-vertical" ${this._config.label_position === 'right-vertical' ? 'selected' : ''}>Right (Vertical)</option>
                     </select>
                 </div>
                 <div class="option">
                     <label class="label">Timezone</label>
                     <select class="value" id="timezone">
                         <option value="null" ${!this._config.timezone ? 'selected' : ''}>Local Time</option>
-                        <optgroup label="UTC">
-                            <option value="UTC" ${this._config.timezone === 'UTC' ? 'selected' : ''}>UTC</option>
+                        <optgroup label="UTC / GMT">
+                            <option value='{"value":"UTC","label":"UTC"}' ${this.getTimezoneMatch('UTC', 'UTC') ? 'selected' : ''}>UTC</option>
+                            <option value='{"value":"UTC","label":"UTC (Z)"}' ${this.getTimezoneMatch('UTC', 'UTC (Z)') ? 'selected' : ''}>UTC (Z)</option>
+                            <option value='{"value":"UTC","label":"GMT"}' ${this.getTimezoneMatch('UTC', 'GMT') ? 'selected' : ''}>GMT</option>
+                            <option value='{"value":"UTC","label":"GMT+0"}' ${this.getTimezoneMatch('UTC', 'GMT+0') ? 'selected' : ''}>GMT+0</option>
+                            <option value='{"value":"UTC","label":"ZULU"}' ${this.getTimezoneMatch('UTC', 'ZULU') ? 'selected' : ''}>ZULU</option>
                         </optgroup>
                         <optgroup label="Africa">
-                            <option value="Africa/Abidjan" ${this._config.timezone === 'Africa/Abidjan' ? 'selected' : ''}>Abidjan</option>
-                            <option value="Africa/Accra" ${this._config.timezone === 'Africa/Accra' ? 'selected' : ''}>Accra</option>
-                            <option value="Africa/Addis_Ababa" ${this._config.timezone === 'Africa/Addis_Ababa' ? 'selected' : ''}>Addis Ababa</option>
-                            <option value="Africa/Algiers" ${this._config.timezone === 'Africa/Algiers' ? 'selected' : ''}>Algiers</option>
-                            <option value="Africa/Cairo" ${this._config.timezone === 'Africa/Cairo' ? 'selected' : ''}>Cairo</option>
-                            <option value="Africa/Casablanca" ${this._config.timezone === 'Africa/Casablanca' ? 'selected' : ''}>Casablanca</option>
-                            <option value="Africa/Johannesburg" ${this._config.timezone === 'Africa/Johannesburg' ? 'selected' : ''}>Johannesburg</option>
-                            <option value="Africa/Lagos" ${this._config.timezone === 'Africa/Lagos' ? 'selected' : ''}>Lagos</option>
-                            <option value="Africa/Nairobi" ${this._config.timezone === 'Africa/Nairobi' ? 'selected' : ''}>Nairobi</option>
-                            <option value="Africa/Tunis" ${this._config.timezone === 'Africa/Tunis' ? 'selected' : ''}>Tunis</option>
+                            <option value='{"value":"Africa/Cairo","label":"Cairo"}' ${this.getTimezoneMatch('Africa/Cairo', 'Cairo') ? 'selected' : ''}>Cairo</option>
+                            <option value='{"value":"Africa/Cairo","label":"Cairo (GMT+2)"}' ${this.getTimezoneMatch('Africa/Cairo', 'Cairo (GMT+2)') ? 'selected' : ''}>Cairo (GMT+2)</option>
+                            <option value='{"value":"Africa/Cairo","label":"Egypt"}' ${this.getTimezoneMatch('Africa/Cairo', 'Egypt') ? 'selected' : ''}>Egypt</option>
+                            <option value='{"value":"Africa/Johannesburg","label":"Johannesburg"}' ${this.getTimezoneMatch('Africa/Johannesburg', 'Johannesburg') ? 'selected' : ''}>Johannesburg</option>
+                            <option value='{"value":"Africa/Johannesburg","label":"South Africa"}' ${this.getTimezoneMatch('Africa/Johannesburg', 'South Africa') ? 'selected' : ''}>South Africa</option>
+                            <option value='{"value":"Africa/Johannesburg","label":"SAST"}' ${this.getTimezoneMatch('Africa/Johannesburg', 'SAST') ? 'selected' : ''}>SAST</option>
+                            <option value='{"value":"Africa/Lagos","label":"Lagos"}' ${this.getTimezoneMatch('Africa/Lagos', 'Lagos') ? 'selected' : ''}>Lagos</option>
+                            <option value='{"value":"Africa/Lagos","label":"Nigeria"}' ${this.getTimezoneMatch('Africa/Lagos', 'Nigeria') ? 'selected' : ''}>Nigeria</option>
+                            <option value='{"value":"Africa/Nairobi","label":"Nairobi"}' ${this.getTimezoneMatch('Africa/Nairobi', 'Nairobi') ? 'selected' : ''}>Nairobi</option>
+                            <option value='{"value":"Africa/Nairobi","label":"Kenya"}' ${this.getTimezoneMatch('Africa/Nairobi', 'Kenya') ? 'selected' : ''}>Kenya</option>
+                            <option value='{"value":"Africa/Nairobi","label":"EAT"}' ${this.getTimezoneMatch('Africa/Nairobi', 'EAT') ? 'selected' : ''}>EAT</option>
                         </optgroup>
                         <optgroup label="America - North">
-                            <option value="America/Anchorage" ${this._config.timezone === 'America/Anchorage' ? 'selected' : ''}>Anchorage</option>
-                            <option value="America/Chicago" ${this._config.timezone === 'America/Chicago' ? 'selected' : ''}>Chicago</option>
-                            <option value="America/Denver" ${this._config.timezone === 'America/Denver' ? 'selected' : ''}>Denver</option>
-                            <option value="America/Los_Angeles" ${this._config.timezone === 'America/Los_Angeles' ? 'selected' : ''}>Los Angeles</option>
-                            <option value="America/Mexico_City" ${this._config.timezone === 'America/Mexico_City' ? 'selected' : ''}>Mexico City</option>
-                            <option value="America/New_York" ${this._config.timezone === 'America/New_York' ? 'selected' : ''}>New York</option>
-                            <option value="America/Phoenix" ${this._config.timezone === 'America/Phoenix' ? 'selected' : ''}>Phoenix</option>
-                            <option value="America/Toronto" ${this._config.timezone === 'America/Toronto' ? 'selected' : ''}>Toronto</option>
-                            <option value="America/Vancouver" ${this._config.timezone === 'America/Vancouver' ? 'selected' : ''}>Vancouver</option>
+                            <option value='{"value":"America/New_York","label":"New York"}' ${this.getTimezoneMatch('America/New_York', 'New York') ? 'selected' : ''}>New York</option>
+                            <option value='{"value":"America/New_York","label":"NYC"}' ${this.getTimezoneMatch('America/New_York', 'NYC') ? 'selected' : ''}>NYC</option>
+                            <option value='{"value":"America/New_York","label":"EST/EDT"}' ${this.getTimezoneMatch('America/New_York', 'EST/EDT') ? 'selected' : ''}>EST/EDT</option>
+                            <option value='{"value":"America/New_York","label":"Eastern Time"}' ${this.getTimezoneMatch('America/New_York', 'Eastern Time') ? 'selected' : ''}>Eastern Time</option>
+                            <option value='{"value":"America/Los_Angeles","label":"Los Angeles"}' ${this.getTimezoneMatch('America/Los_Angeles', 'Los Angeles') ? 'selected' : ''}>Los Angeles</option>
+                            <option value='{"value":"America/Los_Angeles","label":"LA"}' ${this.getTimezoneMatch('America/Los_Angeles', 'LA') ? 'selected' : ''}>LA</option>
+                            <option value='{"value":"America/Los_Angeles","label":"PST/PDT"}' ${this.getTimezoneMatch('America/Los_Angeles', 'PST/PDT') ? 'selected' : ''}>PST/PDT</option>
+                            <option value='{"value":"America/Los_Angeles","label":"Pacific Time"}' ${this.getTimezoneMatch('America/Los_Angeles', 'Pacific Time') ? 'selected' : ''}>Pacific Time</option>
+                            <option value='{"value":"America/Chicago","label":"Chicago"}' ${this.getTimezoneMatch('America/Chicago', 'Chicago') ? 'selected' : ''}>Chicago</option>
+                            <option value='{"value":"America/Chicago","label":"CST/CDT"}' ${this.getTimezoneMatch('America/Chicago', 'CST/CDT') ? 'selected' : ''}>CST/CDT</option>
+                            <option value='{"value":"America/Chicago","label":"Central Time"}' ${this.getTimezoneMatch('America/Chicago', 'Central Time') ? 'selected' : ''}>Central Time</option>
+                            <option value='{"value":"America/Denver","label":"Denver"}' ${this.getTimezoneMatch('America/Denver', 'Denver') ? 'selected' : ''}>Denver</option>
+                            <option value='{"value":"America/Denver","label":"MST/MDT"}' ${this.getTimezoneMatch('America/Denver', 'MST/MDT') ? 'selected' : ''}>MST/MDT</option>
+                            <option value='{"value":"America/Denver","label":"Mountain Time"}' ${this.getTimezoneMatch('America/Denver', 'Mountain Time') ? 'selected' : ''}>Mountain Time</option>
+                            <option value='{"value":"America/Toronto","label":"Toronto"}' ${this.getTimezoneMatch('America/Toronto', 'Toronto') ? 'selected' : ''}>Toronto</option>
+                            <option value='{"value":"America/Toronto","label":"Canada"}' ${this.getTimezoneMatch('America/Toronto', 'Canada') ? 'selected' : ''}>Canada</option>
+                            <option value='{"value":"America/Mexico_City","label":"Mexico City"}' ${this.getTimezoneMatch('America/Mexico_City', 'Mexico City') ? 'selected' : ''}>Mexico City</option>
+                            <option value='{"value":"America/Mexico_City","label":"Mexico"}' ${this.getTimezoneMatch('America/Mexico_City', 'Mexico') ? 'selected' : ''}>Mexico</option>
                         </optgroup>
-                        <optgroup label="America - South & Central">
-                            <option value="America/Argentina/Buenos_Aires" ${this._config.timezone === 'America/Argentina/Buenos_Aires' ? 'selected' : ''}>Buenos Aires</option>
-                            <option value="America/Bogota" ${this._config.timezone === 'America/Bogota' ? 'selected' : ''}>Bogota</option>
-                            <option value="America/Caracas" ${this._config.timezone === 'America/Caracas' ? 'selected' : ''}>Caracas</option>
-                            <option value="America/Lima" ${this._config.timezone === 'America/Lima' ? 'selected' : ''}>Lima</option>
-                            <option value="America/Santiago" ${this._config.timezone === 'America/Santiago' ? 'selected' : ''}>Santiago</option>
-                            <option value="America/Sao_Paulo" ${this._config.timezone === 'America/Sao_Paulo' ? 'selected' : ''}>São Paulo</option>
+                        <optgroup label="America - South">
+                            <option value='{"value":"America/Sao_Paulo","label":"São Paulo"}' ${this.getTimezoneMatch('America/Sao_Paulo', 'São Paulo') ? 'selected' : ''}>São Paulo</option>
+                            <option value='{"value":"America/Sao_Paulo","label":"Brazil"}' ${this.getTimezoneMatch('America/Sao_Paulo', 'Brazil') ? 'selected' : ''}>Brazil</option>
+                            <option value='{"value":"America/Sao_Paulo","label":"BRT"}' ${this.getTimezoneMatch('America/Sao_Paulo', 'BRT') ? 'selected' : ''}>BRT</option>
+                            <option value='{"value":"America/Argentina/Buenos_Aires","label":"Buenos Aires"}' ${this.getTimezoneMatch('America/Argentina/Buenos_Aires', 'Buenos Aires') ? 'selected' : ''}>Buenos Aires</option>
+                            <option value='{"value":"America/Argentina/Buenos_Aires","label":"Argentina"}' ${this.getTimezoneMatch('America/Argentina/Buenos_Aires', 'Argentina') ? 'selected' : ''}>Argentina</option>
+                            <option value='{"value":"America/Bogota","label":"Bogota"}' ${this.getTimezoneMatch('America/Bogota', 'Bogota') ? 'selected' : ''}>Bogota</option>
+                            <option value='{"value":"America/Bogota","label":"Colombia"}' ${this.getTimezoneMatch('America/Bogota', 'Colombia') ? 'selected' : ''}>Colombia</option>
+                            <option value='{"value":"America/Santiago","label":"Santiago"}' ${this.getTimezoneMatch('America/Santiago', 'Santiago') ? 'selected' : ''}>Santiago</option>
+                            <option value='{"value":"America/Santiago","label":"Chile"}' ${this.getTimezoneMatch('America/Santiago', 'Chile') ? 'selected' : ''}>Chile</option>
                         </optgroup>
                         <optgroup label="Asia - East">
-                            <option value="Asia/Bangkok" ${this._config.timezone === 'Asia/Bangkok' ? 'selected' : ''}>Bangkok</option>
-                            <option value="Asia/Hong_Kong" ${this._config.timezone === 'Asia/Hong_Kong' ? 'selected' : ''}>Hong Kong</option>
-                            <option value="Asia/Jakarta" ${this._config.timezone === 'Asia/Jakarta' ? 'selected' : ''}>Jakarta</option>
-                            <option value="Asia/Kuala_Lumpur" ${this._config.timezone === 'Asia/Kuala_Lumpur' ? 'selected' : ''}>Kuala Lumpur</option>
-                            <option value="Asia/Manila" ${this._config.timezone === 'Asia/Manila' ? 'selected' : ''}>Manila</option>
-                            <option value="Asia/Seoul" ${this._config.timezone === 'Asia/Seoul' ? 'selected' : ''}>Seoul</option>
-                            <option value="Asia/Shanghai" ${this._config.timezone === 'Asia/Shanghai' ? 'selected' : ''}>Shanghai</option>
-                            <option value="Asia/Singapore" ${this._config.timezone === 'Asia/Singapore' ? 'selected' : ''}>Singapore</option>
-                            <option value="Asia/Taipei" ${this._config.timezone === 'Asia/Taipei' ? 'selected' : ''}>Taipei</option>
-                            <option value="Asia/Tokyo" ${this._config.timezone === 'Asia/Tokyo' ? 'selected' : ''}>Tokyo</option>
+                            <option value='{"value":"Asia/Tokyo","label":"Tokyo"}' ${this.getTimezoneMatch('Asia/Tokyo', 'Tokyo') ? 'selected' : ''}>Tokyo</option>
+                            <option value='{"value":"Asia/Tokyo","label":"Japan"}' ${this.getTimezoneMatch('Asia/Tokyo', 'Japan') ? 'selected' : ''}>Japan</option>
+                            <option value='{"value":"Asia/Tokyo","label":"JST"}' ${this.getTimezoneMatch('Asia/Tokyo', 'JST') ? 'selected' : ''}>JST</option>
+                            <option value='{"value":"Asia/Tokyo","label":"Tokyo (GMT+9)"}' ${this.getTimezoneMatch('Asia/Tokyo', 'Tokyo (GMT+9)') ? 'selected' : ''}>Tokyo (GMT+9)</option>
+                            <option value='{"value":"Asia/Hong_Kong","label":"Hong Kong"}' ${this.getTimezoneMatch('Asia/Hong_Kong', 'Hong Kong') ? 'selected' : ''}>Hong Kong</option>
+                            <option value='{"value":"Asia/Hong_Kong","label":"HKT"}' ${this.getTimezoneMatch('Asia/Hong_Kong', 'HKT') ? 'selected' : ''}>HKT</option>
+                            <option value='{"value":"Asia/Shanghai","label":"Shanghai"}' ${this.getTimezoneMatch('Asia/Shanghai', 'Shanghai') ? 'selected' : ''}>Shanghai</option>
+                            <option value='{"value":"Asia/Shanghai","label":"Beijing"}' ${this.getTimezoneMatch('Asia/Shanghai', 'Beijing') ? 'selected' : ''}>Beijing</option>
+                            <option value='{"value":"Asia/Shanghai","label":"China"}' ${this.getTimezoneMatch('Asia/Shanghai', 'China') ? 'selected' : ''}>China</option>
+                            <option value='{"value":"Asia/Shanghai","label":"CST"}' ${this.getTimezoneMatch('Asia/Shanghai', 'CST') ? 'selected' : ''}>CST</option>
+                            <option value='{"value":"Asia/Singapore","label":"Singapore"}' ${this.getTimezoneMatch('Asia/Singapore', 'Singapore') ? 'selected' : ''}>Singapore</option>
+                            <option value='{"value":"Asia/Singapore","label":"SGT"}' ${this.getTimezoneMatch('Asia/Singapore', 'SGT') ? 'selected' : ''}>SGT</option>
+                            <option value='{"value":"Asia/Seoul","label":"Seoul"}' ${this.getTimezoneMatch('Asia/Seoul', 'Seoul') ? 'selected' : ''}>Seoul</option>
+                            <option value='{"value":"Asia/Seoul","label":"Korea"}' ${this.getTimezoneMatch('Asia/Seoul', 'Korea') ? 'selected' : ''}>Korea</option>
+                            <option value='{"value":"Asia/Bangkok","label":"Bangkok"}' ${this.getTimezoneMatch('Asia/Bangkok', 'Bangkok') ? 'selected' : ''}>Bangkok</option>
+                            <option value='{"value":"Asia/Bangkok","label":"Thailand"}' ${this.getTimezoneMatch('Asia/Bangkok', 'Thailand') ? 'selected' : ''}>Thailand</option>
                         </optgroup>
-                        <optgroup label="Asia - Middle East & Central">
-                            <option value="Asia/Dubai" ${this._config.timezone === 'Asia/Dubai' ? 'selected' : ''}>Dubai</option>
-                            <option value="Asia/Jerusalem" ${this._config.timezone === 'Asia/Jerusalem' ? 'selected' : ''}>Jerusalem</option>
-                            <option value="Asia/Karachi" ${this._config.timezone === 'Asia/Karachi' ? 'selected' : ''}>Karachi</option>
-                            <option value="Asia/Kolkata" ${this._config.timezone === 'Asia/Kolkata' ? 'selected' : ''}>Kolkata</option>
-                            <option value="Asia/Riyadh" ${this._config.timezone === 'Asia/Riyadh' ? 'selected' : ''}>Riyadh</option>
-                            <option value="Asia/Tehran" ${this._config.timezone === 'Asia/Tehran' ? 'selected' : ''}>Tehran</option>
-                        </optgroup>
-                        <optgroup label="Asia - Siberia & Far East">
-                            <option value="Asia/Vladivostok" ${this._config.timezone === 'Asia/Vladivostok' ? 'selected' : ''}>Vladivostok</option>
-                            <option value="Asia/Yakutsk" ${this._config.timezone === 'Asia/Yakutsk' ? 'selected' : ''}>Yakutsk</option>
-                            <option value="Asia/Yekaterinburg" ${this._config.timezone === 'Asia/Yekaterinburg' ? 'selected' : ''}>Yekaterinburg</option>
-                        </optgroup>
-                        <optgroup label="Atlantic">
-                            <option value="Atlantic/Azores" ${this._config.timezone === 'Atlantic/Azores' ? 'selected' : ''}>Azores</option>
-                            <option value="Atlantic/Cape_Verde" ${this._config.timezone === 'Atlantic/Cape_Verde' ? 'selected' : ''}>Cape Verde</option>
-                            <option value="Atlantic/Reykjavik" ${this._config.timezone === 'Atlantic/Reykjavik' ? 'selected' : ''}>Reykjavik</option>
+                        <optgroup label="Asia - Middle East">
+                            <option value='{"value":"Asia/Dubai","label":"Dubai"}' ${this.getTimezoneMatch('Asia/Dubai', 'Dubai') ? 'selected' : ''}>Dubai</option>
+                            <option value='{"value":"Asia/Dubai","label":"UAE"}' ${this.getTimezoneMatch('Asia/Dubai', 'UAE') ? 'selected' : ''}>UAE</option>
+                            <option value='{"value":"Asia/Dubai","label":"GST"}' ${this.getTimezoneMatch('Asia/Dubai', 'GST') ? 'selected' : ''}>GST</option>
+                            <option value='{"value":"Asia/Kolkata","label":"Mumbai"}' ${this.getTimezoneMatch('Asia/Kolkata', 'Mumbai') ? 'selected' : ''}>Mumbai</option>
+                            <option value='{"value":"Asia/Kolkata","label":"India"}' ${this.getTimezoneMatch('Asia/Kolkata', 'India') ? 'selected' : ''}>India</option>
+                            <option value='{"value":"Asia/Kolkata","label":"IST"}' ${this.getTimezoneMatch('Asia/Kolkata', 'IST') ? 'selected' : ''}>IST</option>
+                            <option value='{"value":"Asia/Jerusalem","label":"Jerusalem"}' ${this.getTimezoneMatch('Asia/Jerusalem', 'Jerusalem') ? 'selected' : ''}>Jerusalem</option>
+                            <option value='{"value":"Asia/Jerusalem","label":"Israel"}' ${this.getTimezoneMatch('Asia/Jerusalem', 'Israel') ? 'selected' : ''}>Israel</option>
+                            <option value='{"value":"Asia/Riyadh","label":"Riyadh"}' ${this.getTimezoneMatch('Asia/Riyadh', 'Riyadh') ? 'selected' : ''}>Riyadh</option>
+                            <option value='{"value":"Asia/Riyadh","label":"Saudi Arabia"}' ${this.getTimezoneMatch('Asia/Riyadh', 'Saudi Arabia') ? 'selected' : ''}>Saudi Arabia</option>
                         </optgroup>
                         <optgroup label="Australia & Pacific">
-                            <option value="Australia/Adelaide" ${this._config.timezone === 'Australia/Adelaide' ? 'selected' : ''}>Adelaide</option>
-                            <option value="Australia/Brisbane" ${this._config.timezone === 'Australia/Brisbane' ? 'selected' : ''}>Brisbane</option>
-                            <option value="Australia/Darwin" ${this._config.timezone === 'Australia/Darwin' ? 'selected' : ''}>Darwin</option>
-                            <option value="Australia/Melbourne" ${this._config.timezone === 'Australia/Melbourne' ? 'selected' : ''}>Melbourne</option>
-                            <option value="Australia/Perth" ${this._config.timezone === 'Australia/Perth' ? 'selected' : ''}>Perth</option>
-                            <option value="Australia/Sydney" ${this._config.timezone === 'Australia/Sydney' ? 'selected' : ''}>Sydney</option>
-                            <option value="Pacific/Auckland" ${this._config.timezone === 'Pacific/Auckland' ? 'selected' : ''}>Auckland</option>
-                            <option value="Pacific/Fiji" ${this._config.timezone === 'Pacific/Fiji' ? 'selected' : ''}>Fiji</option>
-                            <option value="Pacific/Guam" ${this._config.timezone === 'Pacific/Guam' ? 'selected' : ''}>Guam</option>
-                            <option value="Pacific/Honolulu" ${this._config.timezone === 'Pacific/Honolulu' ? 'selected' : ''}>Honolulu</option>
-                            <option value="Pacific/Tahiti" ${this._config.timezone === 'Pacific/Tahiti' ? 'selected' : ''}>Tahiti</option>
+                            <option value='{"value":"Australia/Sydney","label":"Sydney"}' ${this.getTimezoneMatch('Australia/Sydney', 'Sydney') ? 'selected' : ''}>Sydney</option>
+                            <option value='{"value":"Australia/Sydney","label":"Australia"}' ${this.getTimezoneMatch('Australia/Sydney', 'Australia') ? 'selected' : ''}>Australia</option>
+                            <option value='{"value":"Australia/Sydney","label":"AEDT/AEST"}' ${this.getTimezoneMatch('Australia/Sydney', 'AEDT/AEST') ? 'selected' : ''}>AEDT/AEST</option>
+                            <option value='{"value":"Australia/Melbourne","label":"Melbourne"}' ${this.getTimezoneMatch('Australia/Melbourne', 'Melbourne') ? 'selected' : ''}>Melbourne</option>
+                            <option value='{"value":"Australia/Perth","label":"Perth"}' ${this.getTimezoneMatch('Australia/Perth', 'Perth') ? 'selected' : ''}>Perth</option>
+                            <option value='{"value":"Pacific/Auckland","label":"Auckland"}' ${this.getTimezoneMatch('Pacific/Auckland', 'Auckland') ? 'selected' : ''}>Auckland</option>
+                            <option value='{"value":"Pacific/Auckland","label":"New Zealand"}' ${this.getTimezoneMatch('Pacific/Auckland', 'New Zealand') ? 'selected' : ''}>New Zealand</option>
+                            <option value='{"value":"Pacific/Auckland","label":"NZDT/NZST"}' ${this.getTimezoneMatch('Pacific/Auckland', 'NZDT/NZST') ? 'selected' : ''}>NZDT/NZST</option>
+                            <option value='{"value":"Pacific/Honolulu","label":"Honolulu"}' ${this.getTimezoneMatch('Pacific/Honolulu', 'Honolulu') ? 'selected' : ''}>Honolulu</option>
+                            <option value='{"value":"Pacific/Honolulu","label":"Hawaii"}' ${this.getTimezoneMatch('Pacific/Honolulu', 'Hawaii') ? 'selected' : ''}>Hawaii</option>
+                            <option value='{"value":"Pacific/Honolulu","label":"HST"}' ${this.getTimezoneMatch('Pacific/Honolulu', 'HST') ? 'selected' : ''}>HST</option>
                         </optgroup>
                         <optgroup label="Europe - West">
-                            <option value="Europe/Dublin" ${this._config.timezone === 'Europe/Dublin' ? 'selected' : ''}>Dublin</option>
-                            <option value="Europe/Lisbon" ${this._config.timezone === 'Europe/Lisbon' ? 'selected' : ''}>Lisbon</option>
-                            <option value="Europe/London" ${this._config.timezone === 'Europe/London' ? 'selected' : ''}>London</option>
+                            <option value='{"value":"Europe/London","label":"London"}' ${this.getTimezoneMatch('Europe/London', 'London') ? 'selected' : ''}>London</option>
+                            <option value='{"value":"Europe/London","label":"UK"}' ${this.getTimezoneMatch('Europe/London', 'UK') ? 'selected' : ''}>UK</option>
+                            <option value='{"value":"Europe/London","label":"GMT/BST"}' ${this.getTimezoneMatch('Europe/London', 'GMT/BST') ? 'selected' : ''}>GMT/BST</option>
+                            <option value='{"value":"Europe/Dublin","label":"Dublin"}' ${this.getTimezoneMatch('Europe/Dublin', 'Dublin') ? 'selected' : ''}>Dublin</option>
+                            <option value='{"value":"Europe/Dublin","label":"Ireland"}' ${this.getTimezoneMatch('Europe/Dublin', 'Ireland') ? 'selected' : ''}>Ireland</option>
+                            <option value='{"value":"Europe/Lisbon","label":"Lisbon"}' ${this.getTimezoneMatch('Europe/Lisbon', 'Lisbon') ? 'selected' : ''}>Lisbon</option>
+                            <option value='{"value":"Europe/Lisbon","label":"Portugal"}' ${this.getTimezoneMatch('Europe/Lisbon', 'Portugal') ? 'selected' : ''}>Portugal</option>
                         </optgroup>
                         <optgroup label="Europe - Central">
-                            <option value="Europe/Amsterdam" ${this._config.timezone === 'Europe/Amsterdam' ? 'selected' : ''}>Amsterdam</option>
-                            <option value="Europe/Berlin" ${this._config.timezone === 'Europe/Berlin' ? 'selected' : ''}>Berlin</option>
-                            <option value="Europe/Brussels" ${this._config.timezone === 'Europe/Brussels' ? 'selected' : ''}>Brussels</option>
-                            <option value="Europe/Copenhagen" ${this._config.timezone === 'Europe/Copenhagen' ? 'selected' : ''}>Copenhagen</option>
-                            <option value="Europe/Madrid" ${this._config.timezone === 'Europe/Madrid' ? 'selected' : ''}>Madrid</option>
-                            <option value="Europe/Oslo" ${this._config.timezone === 'Europe/Oslo' ? 'selected' : ''}>Oslo</option>
-                            <option value="Europe/Paris" ${this._config.timezone === 'Europe/Paris' ? 'selected' : ''}>Paris</option>
-                            <option value="Europe/Prague" ${this._config.timezone === 'Europe/Prague' ? 'selected' : ''}>Prague</option>
-                            <option value="Europe/Rome" ${this._config.timezone === 'Europe/Rome' ? 'selected' : ''}>Rome</option>
-                            <option value="Europe/Stockholm" ${this._config.timezone === 'Europe/Stockholm' ? 'selected' : ''}>Stockholm</option>
-                            <option value="Europe/Vienna" ${this._config.timezone === 'Europe/Vienna' ? 'selected' : ''}>Vienna</option>
-                            <option value="Europe/Warsaw" ${this._config.timezone === 'Europe/Warsaw' ? 'selected' : ''}>Warsaw</option>
-                            <option value="Europe/Zurich" ${this._config.timezone === 'Europe/Zurich' ? 'selected' : ''}>Zurich</option>
+                            <option value='{"value":"Europe/Warsaw","label":"Warsaw"}' ${this.getTimezoneMatch('Europe/Warsaw', 'Warsaw') ? 'selected' : ''}>Warsaw</option>
+                            <option value='{"value":"Europe/Warsaw","label":"Warszawa"}' ${this.getTimezoneMatch('Europe/Warsaw', 'Warszawa') ? 'selected' : ''}>Warszawa</option>
+                            <option value='{"value":"Europe/Warsaw","label":"Poland"}' ${this.getTimezoneMatch('Europe/Warsaw', 'Poland') ? 'selected' : ''}>Poland</option>
+                            <option value='{"value":"Europe/Warsaw","label":"Polska"}' ${this.getTimezoneMatch('Europe/Warsaw', 'Polska') ? 'selected' : ''}>Polska</option>
+                            <option value='{"value":"Europe/Warsaw","label":"CET/CEST"}' ${this.getTimezoneMatch('Europe/Warsaw', 'CET/CEST') ? 'selected' : ''}>CET/CEST</option>
+                            <option value='{"value":"Europe/Paris","label":"Paris"}' ${this.getTimezoneMatch('Europe/Paris', 'Paris') ? 'selected' : ''}>Paris</option>
+                            <option value='{"value":"Europe/Paris","label":"France"}' ${this.getTimezoneMatch('Europe/Paris', 'France') ? 'selected' : ''}>France</option>
+                            <option value='{"value":"Europe/Berlin","label":"Berlin"}' ${this.getTimezoneMatch('Europe/Berlin', 'Berlin') ? 'selected' : ''}>Berlin</option>
+                            <option value='{"value":"Europe/Berlin","label":"Germany"}' ${this.getTimezoneMatch('Europe/Berlin', 'Germany') ? 'selected' : ''}>Germany</option>
+                            <option value='{"value":"Europe/Rome","label":"Rome"}' ${this.getTimezoneMatch('Europe/Rome', 'Rome') ? 'selected' : ''}>Rome</option>
+                            <option value='{"value":"Europe/Rome","label":"Italy"}' ${this.getTimezoneMatch('Europe/Rome', 'Italy') ? 'selected' : ''}>Italy</option>
+                            <option value='{"value":"Europe/Madrid","label":"Madrid"}' ${this.getTimezoneMatch('Europe/Madrid', 'Madrid') ? 'selected' : ''}>Madrid</option>
+                            <option value='{"value":"Europe/Madrid","label":"Spain"}' ${this.getTimezoneMatch('Europe/Madrid', 'Spain') ? 'selected' : ''}>Spain</option>
+                            <option value='{"value":"Europe/Amsterdam","label":"Amsterdam"}' ${this.getTimezoneMatch('Europe/Amsterdam', 'Amsterdam') ? 'selected' : ''}>Amsterdam</option>
+                            <option value='{"value":"Europe/Amsterdam","label":"Netherlands"}' ${this.getTimezoneMatch('Europe/Amsterdam', 'Netherlands') ? 'selected' : ''}>Netherlands</option>
+                            <option value='{"value":"Europe/Brussels","label":"Brussels"}' ${this.getTimezoneMatch('Europe/Brussels', 'Brussels') ? 'selected' : ''}>Brussels</option>
+                            <option value='{"value":"Europe/Brussels","label":"Belgium"}' ${this.getTimezoneMatch('Europe/Brussels', 'Belgium') ? 'selected' : ''}>Belgium</option>
+                            <option value='{"value":"Europe/Vienna","label":"Vienna"}' ${this.getTimezoneMatch('Europe/Vienna', 'Vienna') ? 'selected' : ''}>Vienna</option>
+                            <option value='{"value":"Europe/Vienna","label":"Austria"}' ${this.getTimezoneMatch('Europe/Vienna', 'Austria') ? 'selected' : ''}>Austria</option>
+                            <option value='{"value":"Europe/Stockholm","label":"Stockholm"}' ${this.getTimezoneMatch('Europe/Stockholm', 'Stockholm') ? 'selected' : ''}>Stockholm</option>
+                            <option value='{"value":"Europe/Stockholm","label":"Sweden"}' ${this.getTimezoneMatch('Europe/Stockholm', 'Sweden') ? 'selected' : ''}>Sweden</option>
                         </optgroup>
                         <optgroup label="Europe - East">
-                            <option value="Europe/Athens" ${this._config.timezone === 'Europe/Athens' ? 'selected' : ''}>Athens</option>
-                            <option value="Europe/Bucharest" ${this._config.timezone === 'Europe/Bucharest' ? 'selected' : ''}>Bucharest</option>
-                            <option value="Europe/Helsinki" ${this._config.timezone === 'Europe/Helsinki' ? 'selected' : ''}>Helsinki</option>
-                            <option value="Europe/Istanbul" ${this._config.timezone === 'Europe/Istanbul' ? 'selected' : ''}>Istanbul</option>
-                            <option value="Europe/Kiev" ${this._config.timezone === 'Europe/Kiev' ? 'selected' : ''}>Kiev</option>
-                            <option value="Europe/Moscow" ${this._config.timezone === 'Europe/Moscow' ? 'selected' : ''}>Moscow</option>
-                            <option value="Europe/Riga" ${this._config.timezone === 'Europe/Riga' ? 'selected' : ''}>Riga</option>
-                            <option value="Europe/Sofia" ${this._config.timezone === 'Europe/Sofia' ? 'selected' : ''}>Sofia</option>
-                            <option value="Europe/Tallinn" ${this._config.timezone === 'Europe/Tallinn' ? 'selected' : ''}>Tallinn</option>
-                            <option value="Europe/Vilnius" ${this._config.timezone === 'Europe/Vilnius' ? 'selected' : ''}>Vilnius</option>
+                            <option value='{"value":"Europe/Moscow","label":"Moscow"}' ${this.getTimezoneMatch('Europe/Moscow', 'Moscow') ? 'selected' : ''}>Moscow</option>
+                            <option value='{"value":"Europe/Moscow","label":"Russia"}' ${this.getTimezoneMatch('Europe/Moscow', 'Russia') ? 'selected' : ''}>Russia</option>
+                            <option value='{"value":"Europe/Moscow","label":"MSK"}' ${this.getTimezoneMatch('Europe/Moscow', 'MSK') ? 'selected' : ''}>MSK</option>
+                            <option value='{"value":"Europe/Istanbul","label":"Istanbul"}' ${this.getTimezoneMatch('Europe/Istanbul', 'Istanbul') ? 'selected' : ''}>Istanbul</option>
+                            <option value='{"value":"Europe/Istanbul","label":"Turkey"}' ${this.getTimezoneMatch('Europe/Istanbul', 'Turkey') ? 'selected' : ''}>Turkey</option>
+                            <option value='{"value":"Europe/Athens","label":"Athens"}' ${this.getTimezoneMatch('Europe/Athens', 'Athens') ? 'selected' : ''}>Athens</option>
+                            <option value='{"value":"Europe/Athens","label":"Greece"}' ${this.getTimezoneMatch('Europe/Athens', 'Greece') ? 'selected' : ''}>Greece</option>
+                            <option value='{"value":"Europe/Helsinki","label":"Helsinki"}' ${this.getTimezoneMatch('Europe/Helsinki', 'Helsinki') ? 'selected' : ''}>Helsinki</option>
+                            <option value='{"value":"Europe/Helsinki","label":"Finland"}' ${this.getTimezoneMatch('Europe/Helsinki', 'Finland') ? 'selected' : ''}>Finland</option>
                         </optgroup>
                     </select>
                 </div>
@@ -1091,9 +1202,18 @@ class FlipClockCardEditor extends HTMLElement {
                 if (target.type === 'checkbox') value = target.checked;
                 if (target.type === 'number') value = Number(value);
 
-                // Special handling for utc_label and timezone
-                if ((prop === 'utc_label' || prop === 'timezone') && value === 'null') {
-                    value = null;
+                // Special handling for timezone (JSON string)
+                if (prop === 'timezone') {
+                    if (value === 'null') {
+                        value = null;
+                    } else {
+                        try {
+                            value = JSON.parse(value);
+                        } catch (e) {
+                            // If parsing fails, treat as plain string (backward compatibility)
+                            value = value;
+                        }
+                    }
                 }
 
                 const newConfig = { ...this._config, [prop]: value };
