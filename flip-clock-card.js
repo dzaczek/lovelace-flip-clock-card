@@ -1,7 +1,8 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.4
+ * Version: 25.0.5-beta.1
  * A retro-style flip clock card with 3D animations
+ * Fix: Prevent duplicate custom element registration in HA 25.x
  */
 class FlipClockCard extends HTMLElement {
     constructor() {
@@ -11,7 +12,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.4';
+        this.version = '25.0.5-beta.1';
     }
 
     /**
@@ -879,6 +880,12 @@ class FlipClockCardEditor extends HTMLElement {
     }
 }
 
-customElements.define("flip-clock-card-editor", FlipClockCardEditor);
+// Prevent duplicate registration in Home Assistant 25.x
+// Check if custom elements are already defined before registering
+if (!customElements.get("flip-clock-card-editor")) {
+    customElements.define("flip-clock-card-editor", FlipClockCardEditor);
+}
 
-customElements.define('flip-clock-card', FlipClockCard);
+if (!customElements.get('flip-clock-card')) {
+    customElements.define('flip-clock-card', FlipClockCard);
+}
