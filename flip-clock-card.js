@@ -1102,7 +1102,9 @@ window.customCards.push({
 
 class FlipClockCardEditor extends HTMLElement {
     setConfig(config) {
-        this._config = config;
+        // Clone config to avoid modifying the original frozen object
+        this._config = { ...config };
+        
         // Ensure defaults for optional fields if not present, to avoid UI glitches
         if (!this._config.am_pm_position) this._config.am_pm_position = 'right';
         if (!this._config.am_pm_orientation) this._config.am_pm_orientation = 'horizontal';
