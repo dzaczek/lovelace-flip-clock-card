@@ -200,6 +200,12 @@ class FlipClockCard extends HTMLElement {
             // Validate am_pm_distance (percentage of card size: 0-100)
             this.am_pm_distance = this.validateNumber(config?.am_pm_distance, 0, 100, 15);
 
+            // Validate am_pm_size (percentage of card size: 10-100)
+            this.am_pm_size = this.validateNumber(config?.am_pm_size, 10, 100, 50);
+
+            // Validate am_pm_style (flip, text)
+            this.am_pm_style = (config?.am_pm_style === 'text') ? 'text' : 'flip';
+
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
             
@@ -415,6 +421,7 @@ class FlipClockCard extends HTMLElement {
                     --half-speed: ${sanitizedHalfSpeed}s; 
                     --label-size: ${this.validateNumber(this.label_size, 20, 100, 35)}; 
                     --am-pm-distance: calc(var(--card-size) * ${amPmDistance} / 100);
+                    --am-pm-font-size: calc(var(--card-size) * ${this.validateNumber(this.am_pm_size, 10, 100, 50)} / 100);
                 }
                 .clock-container {
                     display: flex;
@@ -478,14 +485,31 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 .am-pm-container .flip-unit {
-                     width: calc(var(--card-size) * 0.45);
-                     height: calc(var(--card-size) * 0.65);
-                     font-size: calc(var(--card-size) * 0.5);
+                     width: calc(var(--am-pm-font-size) * 0.9);
+                     height: calc(var(--am-pm-font-size) * 1.3);
+                     font-size: var(--am-pm-font-size);
                 }
                 
                 .am-pm-container .upper span, 
                 .am-pm-container .lower span {
-                    line-height: calc(var(--card-size) * 0.65);
+                    line-height: calc(var(--am-pm-font-size) * 1.3);
+                }
+
+                /* Text-only AM/PM Style */
+                .am-pm-text {
+                    font-size: var(--am-pm-font-size);
+                    color: var(--flip-text);
+                    font-weight: 700;
+                    font-family: var(--flip-font);
+                    text-shadow: var(--flip-glow);
+                    padding: 0 4px;
+                    
+                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.8;` : ''}
+                    ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
+                }
+                
+                .am-pm-container.style-text {
+                    gap: 4px;
                 }
 
                 .separator {
@@ -687,12 +711,24 @@ class FlipClockCard extends HTMLElement {
             let amPmHtml = '';
             if (this.am_pm_indicator) {
                 // Determine initial AM/PM (approximation, updated immediately by timer)
-                amPmHtml = `
-                    <div class="am-pm-container pos-${this.am_pm_position}">
-                        ${createDigitHtml('ap1', 'A')}
-                        ${createDigitHtml('ap2', 'M')}
-                    </div>
-                `;
+                // We use 'ap1' and 'ap2' for flip digits regardless of style for simpler logic
+                // But for text style we render a span instead
+                
+                if (this.am_pm_style === 'flip') {
+                    amPmHtml = `
+                        <div class="am-pm-container style-flip pos-${this.am_pm_position}">
+                            ${createDigitHtml('ap1', 'A')}
+                            ${createDigitHtml('ap2', 'M')}
+                        </div>
+                    `;
+                } else {
+                    // Text style
+                    amPmHtml = `
+                        <div class="am-pm-container style-text pos-${this.am_pm_position}">
+                            <div class="am-pm-text" id="ap-text">AM</div>
+                        </div>
+                    `;
+                }
             }
 
             // Integrate AM/PM into clock content if position is side
@@ -797,7 +833,7 @@ class FlipClockCard extends HTMLElement {
         if (this.show_seconds) {
             digitIds.push('s1', 's2');
         }
-        if (this.am_pm_indicator) {
+        if (this.am_pm_indicator && this.am_pm_style === 'flip') {
             digitIds.push('ap1', 'ap2');
         }
         
@@ -882,8 +918,19 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 if (this.am_pm_indicator) {
-                    this.updateDigit('ap1', isPm ? 'P' : 'A');
-                    this.updateDigit('ap2', 'M');
+                    const amPmText = isPm ? 'PM' : 'AM';
+                    
+                    if (this.am_pm_style === 'flip') {
+                        this.updateDigit('ap1', amPmText[0]);
+                        this.updateDigit('ap2', amPmText[1]);
+                    } else {
+                        // Update text directly
+                         if (!this.shadowRoot) return;
+                         const textEl = this.shadowRoot.getElementById('ap-text');
+                         if (textEl && textEl.textContent !== amPmText) {
+                             textEl.textContent = amPmText;
+                         }
+                    }
                 }
             } catch (error) {
                 if (this.debug) {
@@ -1082,7 +1129,9 @@ class FlipClockCard extends HTMLElement {
             am_pm_indicator: false,
             am_pm_position: 'right',
             am_pm_orientation: 'horizontal',
-            am_pm_distance: 15
+            am_pm_distance: 15,
+            am_pm_size: 50,
+            am_pm_style: 'flip'
         };
     }
 
@@ -1109,6 +1158,8 @@ class FlipClockCardEditor extends HTMLElement {
         if (!this._config.am_pm_position) this._config.am_pm_position = 'right';
         if (!this._config.am_pm_orientation) this._config.am_pm_orientation = 'horizontal';
         if (this._config.am_pm_distance === undefined) this._config.am_pm_distance = 15;
+        if (this._config.am_pm_size === undefined) this._config.am_pm_size = 50;
+        if (!this._config.am_pm_style) this._config.am_pm_style = 'flip';
         this.render();
     }
 
@@ -1181,6 +1232,13 @@ class FlipClockCardEditor extends HTMLElement {
 
                 ${this._config.time_format === '12' && this._config.am_pm_indicator ? `
                 <div class="option">
+                    <label class="label">AM/PM Style</label>
+                    <select class="value" id="am_pm_style">
+                        <option value="flip" ${(!this._config.am_pm_style || this._config.am_pm_style === 'flip') ? 'selected' : ''}>Flip</option>
+                        <option value="text" ${this._config.am_pm_style === 'text' ? 'selected' : ''}>Text</option>
+                    </select>
+                </div>
+                <div class="option">
                     <label class="label">AM/PM Position</label>
                     <select class="value" id="am_pm_position">
                         <option value="right" ${(!this._config.am_pm_position || this._config.am_pm_position === 'right') ? 'selected' : ''}>Right</option>
@@ -1201,6 +1259,10 @@ class FlipClockCardEditor extends HTMLElement {
                 <div class="option">
                     <label class="label">AM/PM Distance (%)</label>
                     <input type="number" min="0" max="100" class="value" id="am_pm_distance" value="${this._config.am_pm_distance !== undefined ? this._config.am_pm_distance : 15}">
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Size (%)</label>
+                    <input type="number" min="10" max="100" class="value" id="am_pm_size" value="${this._config.am_pm_size !== undefined ? this._config.am_pm_size : 50}">
                 </div>
                 ` : ''}
 
