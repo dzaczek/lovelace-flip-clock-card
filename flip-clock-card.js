@@ -1078,7 +1078,11 @@ class FlipClockCard extends HTMLElement {
             timezone: null,
             show_label: false,
             label_position: 'right',
-            label_size: 35
+            label_size: 35,
+            am_pm_indicator: false,
+            am_pm_position: 'right',
+            am_pm_orientation: 'horizontal',
+            am_pm_distance: 15
         };
     }
 
@@ -1099,6 +1103,10 @@ window.customCards.push({
 class FlipClockCardEditor extends HTMLElement {
     setConfig(config) {
         this._config = config;
+        // Ensure defaults for optional fields if not present, to avoid UI glitches
+        if (!this._config.am_pm_position) this._config.am_pm_position = 'right';
+        if (!this._config.am_pm_orientation) this._config.am_pm_orientation = 'horizontal';
+        if (this._config.am_pm_distance === undefined) this._config.am_pm_distance = 15;
         this.render();
     }
 
