@@ -1,7 +1,11 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.5
+ * Version: 25.2.6-beta1
  * A retro-style flip clock card with 3D animations
+ * New: Added AM/PM indicator with extensive customization
+ * New: AM/PM positioning (top, bottom, left, right, corners)
+ * New: AM/PM orientation (horizontal, vertical)
+ * New: AM/PM custom distance
  * New: Added label_size parameter (20-100% of card size)
  * New: Removed show_utc/utc_label, added show_label & label_position
  * New: Multiple timezone label variants per timezone
@@ -16,7 +20,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.2.5';
+        this.version = '25.2.6-beta1';
     }
 
     /**
@@ -180,6 +184,21 @@ class FlipClockCard extends HTMLElement {
 
             // Validate label_size (percentage of card size: 20-100)
             this.label_size = this.validateNumber(config?.label_size, 20, 100, 35);
+
+            // Validate am_pm_indicator (boolean) - Only relevant if time_format is 12
+            this.am_pm_indicator = (config?.am_pm_indicator === true || config?.am_pm_indicator === 'true') && this.time_format === '12';
+
+            // Validate am_pm_position
+            const validAmPmPositions = ['top', 'bottom', 'left', 'right', 'right-top', 'right-bottom'];
+            this.am_pm_position = validAmPmPositions.includes(config?.am_pm_position) 
+                ? config.am_pm_position 
+                : 'right';
+
+            // Validate am_pm_orientation (horizontal, vertical)
+            this.am_pm_orientation = config?.am_pm_orientation === 'vertical' ? 'vertical' : 'horizontal';
+
+            // Validate am_pm_distance (percentage of card size: 0-100)
+            this.am_pm_distance = this.validateNumber(config?.am_pm_distance, 0, 100, 15);
 
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
@@ -377,6 +396,8 @@ class FlipClockCard extends HTMLElement {
             const sanitizedLine = this.validateColor(t.line) || base.line;
             const sanitizedGlow = this.sanitizeCSSValue(t.glow) || base.glow;
 
+            const amPmDistance = this.validateNumber(this.am_pm_distance, 0, 100, 15);
+
             const style = document.createElement('style');
             style.textContent = `
                 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
@@ -393,6 +414,7 @@ class FlipClockCard extends HTMLElement {
                     --flip-glow: ${sanitizedGlow};
                     --half-speed: ${sanitizedHalfSpeed}s; 
                     --label-size: ${this.validateNumber(this.label_size, 20, 100, 35)}; 
+                    --am-pm-distance: calc(var(--card-size) * ${amPmDistance} / 100);
                 }
                 .clock-container {
                     display: flex;
@@ -401,7 +423,11 @@ class FlipClockCard extends HTMLElement {
                     padding: 20px;
                     background: transparent;
                     perspective: 1000px;
-                    flex-direction: ${this.label_position === 'top' || this.label_position === 'bottom' ? 'column' : 'row'};
+                    flex-direction: ${
+                        (this.label_position === 'top' || this.label_position === 'bottom') ||
+                        (this.am_pm_indicator && (this.am_pm_position === 'top' || this.am_pm_position === 'bottom'))
+                        ? 'column' : 'row'
+                    };
                 }
                 .clock-wrapper {
                     display: flex;
@@ -412,6 +438,56 @@ class FlipClockCard extends HTMLElement {
                     display: flex;
                     gap: calc(var(--card-size) * 0.15);
                 }
+                
+                /* AM/PM STYLES */
+                .am-pm-container {
+                    display: flex;
+                    flex-direction: ${this.am_pm_orientation === 'vertical' ? 'column' : 'row'};
+                    gap: calc(var(--card-size) * 0.05);
+                    align-items: center;
+                    justify-content: center;
+                }
+                
+                .am-pm-container.pos-right, 
+                .am-pm-container.pos-right-top, 
+                .am-pm-container.pos-right-bottom {
+                     margin-left: var(--am-pm-distance);
+                }
+                
+                .am-pm-container.pos-left {
+                     margin-right: var(--am-pm-distance);
+                     order: -1; /* For flex ordering */
+                }
+                
+                .am-pm-container.pos-top {
+                     margin-bottom: var(--am-pm-distance);
+                     order: -2; /* Ensure it's above clock */
+                }
+                
+                .am-pm-container.pos-bottom {
+                     margin-top: var(--am-pm-distance);
+                     order: 2; /* Ensure it's below clock */
+                }
+
+                .am-pm-container.pos-right-top {
+                    align-self: flex-start;
+                }
+                
+                .am-pm-container.pos-right-bottom {
+                    align-self: flex-end;
+                }
+
+                .am-pm-container .flip-unit {
+                     width: calc(var(--card-size) * 0.45);
+                     height: calc(var(--card-size) * 0.65);
+                     font-size: calc(var(--card-size) * 0.5);
+                }
+                
+                .am-pm-container .upper span, 
+                .am-pm-container .lower span {
+                    line-height: calc(var(--card-size) * 0.65);
+                }
+
                 .separator {
                     font-size: calc(var(--card-size) * 0.6);
                     color: var(--flip-text);
@@ -575,17 +651,17 @@ class FlipClockCard extends HTMLElement {
             const container = document.createElement('div');
             container.className = 'clock-container';
             
-            const createDigitHtml = (id) => `
+            const createDigitHtml = (id, initialValue = '0') => `
                 <div class="flip-unit" id="${id}">
-                    <div class="upper upper-back"><span>0</span></div>
-                    <div class="lower lower-back"><span>0</span></div>
-                    <div class="upper flip-card"><span>0</span></div>
-                    <div class="lower flip-card"><span>0</span></div>
+                    <div class="upper upper-back"><span>${initialValue}</span></div>
+                    <div class="lower lower-back"><span>${initialValue}</span></div>
+                    <div class="upper flip-card"><span>${initialValue}</span></div>
+                    <div class="lower flip-card"><span>${initialValue}</span></div>
                 </div>
             `;
 
             // Build clock HTML
-            let clockHtml = `
+            let clockDigitsHtml = `
                 <div class="digit-group">
                     ${createDigitHtml('h1')}
                     ${createDigitHtml('h2')}
@@ -598,13 +674,49 @@ class FlipClockCard extends HTMLElement {
             `;
 
             if (this.show_seconds) {
-                clockHtml += `
+                clockDigitsHtml += `
                     <div class="separator">:</div>
                     <div class="digit-group">
                         ${createDigitHtml('s1')}
                         ${createDigitHtml('s2')}
                     </div>
                 `;
+            }
+
+            // Generate AM/PM HTML if enabled
+            let amPmHtml = '';
+            if (this.am_pm_indicator) {
+                // Determine initial AM/PM (approximation, updated immediately by timer)
+                amPmHtml = `
+                    <div class="am-pm-container pos-${this.am_pm_position}">
+                        ${createDigitHtml('ap1', 'A')}
+                        ${createDigitHtml('ap2', 'M')}
+                    </div>
+                `;
+            }
+
+            // Integrate AM/PM into clock content if position is side
+            let clockContentHtml = clockDigitsHtml;
+            const isSidePosition = ['left', 'right', 'right-top', 'right-bottom'].includes(this.am_pm_position);
+            
+            if (this.am_pm_indicator && isSidePosition) {
+                if (this.am_pm_position === 'left') {
+                    clockContentHtml = amPmHtml + clockContentHtml;
+                } else {
+                    clockContentHtml = clockContentHtml + amPmHtml;
+                }
+            }
+
+            // Wrap in clock-wrapper
+            let mainHtml = `<div class="clock-wrapper">${clockContentHtml}</div>`;
+
+            // Integrate AM/PM if position is top/bottom
+            if (this.am_pm_indicator && !isSidePosition) {
+                if (this.am_pm_position === 'top') {
+                    mainHtml = amPmHtml + mainHtml;
+                } else if (this.am_pm_position === 'bottom') {
+                    mainHtml = mainHtml + amPmHtml;
+                }
             }
 
             // Determine label to display
@@ -615,29 +727,45 @@ class FlipClockCard extends HTMLElement {
             if (this.label_position === 'top' && labelText) {
                 html = `
                     <div class="timezone-label position-top">${labelText}</div>
-                    <div class="clock-wrapper">${clockHtml}</div>
+                    ${mainHtml}
                 `;
             } else if (this.label_position === 'bottom' && labelText) {
                 html = `
-                    <div class="clock-wrapper">${clockHtml}</div>
+                    ${mainHtml}
                     <div class="timezone-label position-bottom">${labelText}</div>
                 `;
             } else {
                 // left, right, right-vertical
-                html = `<div class="clock-wrapper">${clockHtml}`;
+                // If label is side, mainHtml (clock-wrapper [+ am/pm vertical]) is one block.
+                // But wait, if am/pm is top/bottom, mainHtml contains multiple divs.
+                // clock-wrapper handles the flex row for digits.
+                // If label is side, we expect a flex-row container (clock-container) to hold label + main content.
+                // But if mainHtml has multiple blocks (AM/PM top + Clock), we need to wrap them so they stay together relative to the label?
+                // Or let them stack?
+                // If label is 'right', we want: [ [AM/PM] [Clock] ] [Label] ? No.
+                // If AM/PM is top:
+                // [AM/PM]
+                // [Clock]
+                // [Label] (Right)
+                
+                // If we want label on right of the whole group, we need a wrapper around Main content.
+                
+                const wrappedMain = (this.am_pm_indicator && !isSidePosition) 
+                    ? `<div style="display:flex; flex-direction:column; align-items:center;">${mainHtml}</div>` 
+                    : mainHtml;
+
                 if (labelText) {
-                    if (this.label_position === 'left') {
-                        html = `<div class="clock-wrapper">
-                            <div class="timezone-label position-left">${labelText}</div>
-                            ${clockHtml}`;
-                    } else if (this.label_position === 'right-vertical') {
-                        html += `<div class="timezone-label position-right-vertical">${labelText}</div>`;
-                    } else {
-                        // right (default)
-                        html += `<div class="timezone-label position-right">${labelText}</div>`;
-                    }
+                     if (this.label_position === 'left') {
+                        html = `<div class="timezone-label position-left">${labelText}</div>${wrappedMain}`;
+                     } else if (this.label_position === 'right-vertical') {
+                        html = `${wrappedMain}<div class="timezone-label position-right-vertical">${labelText}</div>`;
+                     } else {
+                        // right
+                        html = `${wrappedMain}<div class="timezone-label position-right">${labelText}</div>`;
+                     }
+                } else {
+                    html = wrappedMain;
                 }
-                html += `</div>`;
             }
 
             container.innerHTML = html;
@@ -668,6 +796,9 @@ class FlipClockCard extends HTMLElement {
         const digitIds = ['h1', 'h2', 'm1', 'm2'];
         if (this.show_seconds) {
             digitIds.push('s1', 's2');
+        }
+        if (this.am_pm_indicator) {
+            digitIds.push('ap1', 'ap2');
         }
         
         digitIds.forEach(id => {
@@ -730,7 +861,11 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 // 12-hour format logic
-                if (this.time_format === '12') h = h % 12 || 12;
+                let isPm = false;
+                if (this.time_format === '12') {
+                    isPm = h >= 12;
+                    h = h % 12 || 12;
+                }
 
                 const hStr = String(h).padStart(2, '0');
                 const mStr = String(m).padStart(2, '0');
@@ -744,6 +879,11 @@ class FlipClockCard extends HTMLElement {
                 if (this.show_seconds) {
                     this.updateDigit('s1', sStr[0]);
                     this.updateDigit('s2', sStr[1]);
+                }
+
+                if (this.am_pm_indicator) {
+                    this.updateDigit('ap1', isPm ? 'P' : 'A');
+                    this.updateDigit('ap2', 'M');
                 }
             } catch (error) {
                 if (this.debug) {
@@ -1021,6 +1161,39 @@ class FlipClockCardEditor extends HTMLElement {
                         <option value="12" ${this._config.time_format === '12' ? 'selected' : ''}>12h</option>
                     </select>
                 </div>
+                
+                ${this._config.time_format === '12' ? `
+                <div class="option">
+                    <label class="label">Show AM/PM</label>
+                    <input type="checkbox" class="value" id="am_pm_indicator" ${this._config.am_pm_indicator ? 'checked' : ''}>
+                </div>
+                ` : ''}
+
+                ${this._config.time_format === '12' && this._config.am_pm_indicator ? `
+                <div class="option">
+                    <label class="label">AM/PM Position</label>
+                    <select class="value" id="am_pm_position">
+                        <option value="right" ${(!this._config.am_pm_position || this._config.am_pm_position === 'right') ? 'selected' : ''}>Right</option>
+                        <option value="left" ${this._config.am_pm_position === 'left' ? 'selected' : ''}>Left</option>
+                        <option value="top" ${this._config.am_pm_position === 'top' ? 'selected' : ''}>Top</option>
+                        <option value="bottom" ${this._config.am_pm_position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                        <option value="right-top" ${this._config.am_pm_position === 'right-top' ? 'selected' : ''}>Right Top</option>
+                        <option value="right-bottom" ${this._config.am_pm_position === 'right-bottom' ? 'selected' : ''}>Right Bottom</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Orientation</label>
+                    <select class="value" id="am_pm_orientation">
+                        <option value="horizontal" ${(!this._config.am_pm_orientation || this._config.am_pm_orientation === 'horizontal') ? 'selected' : ''}>Horizontal</option>
+                        <option value="vertical" ${this._config.am_pm_orientation === 'vertical' ? 'selected' : ''}>Vertical</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Distance (%)</label>
+                    <input type="number" min="0" max="100" class="value" id="am_pm_distance" value="${this._config.am_pm_distance !== undefined ? this._config.am_pm_distance : 15}">
+                </div>
+                ` : ''}
+
                 <div class="option">
                     <label class="label">Show Seconds</label>
                     <input type="checkbox" class="value" id="show_seconds" ${this._config.show_seconds ? 'checked' : ''}>
