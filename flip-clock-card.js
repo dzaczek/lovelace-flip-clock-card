@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.4-beta
+ * Version: 25.2.5-beta
  * A retro-style flip clock card with 3D animations
  * New: Added label_size parameter (20-100% of card size)
  * New: Removed show_utc/utc_label, added show_label & label_position
@@ -16,7 +16,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.2.4-beta';
+        this.version = '25.2.5-beta';
     }
 
     /**
@@ -160,7 +160,14 @@ class FlipClockCard extends HTMLElement {
 
             // Validate timezone (IANA timezone identifier)
             this.timezone = config?.timezone || null;
-            this.timezone_label = null;
+            
+            // Generate label from timezone string if it exists
+            if (this.timezone) {
+                const parts = this.timezone.split('/');
+                this.timezone_label = parts[parts.length - 1].replace(/_/g, ' ');
+            } else {
+                this.timezone_label = null;
+            }
 
             // Validate show_label (boolean)
             this.show_label = config?.show_label === true || config?.show_label === 'true';
