@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.6-beta6
+ * Version: 25.2.6
  * A retro-style flip clock card with 3D animations
  * New: Added AM/PM indicator with extensive customization
  * New: AM/PM positioning (top, bottom, left, right, corners)
@@ -20,7 +20,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.2.6-beta6';
+        this.version = '25.2.6';
     }
 
     /**
