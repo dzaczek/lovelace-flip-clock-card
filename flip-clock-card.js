@@ -1,7 +1,20 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.0.4-beta
+ * Version: 25.2.7
  * A retro-style flip clock card with 3D animations
+ * New in 25.2.7:
+ * - Added 'between' position for AM/PM (replaces : separator between hours/minutes)
+ * - Fixed vertical orientation for text-style AM/PM indicator
+ * Previous features:
+ * - AM/PM indicator with extensive customization
+ * - AM/PM positioning (top, bottom, left, right, corners, between)
+ * - AM/PM orientation (horizontal, vertical) - works with both flip and text styles
+ * - AM/PM custom distance and size
+ * - Label_size parameter (10-100 pixels)
+ * - show_label & label_position for timezone labels
+ * - Multiple timezone label variants per timezone
+ * - Label positioning (right, left, top, bottom, right-vertical)
+ * Fix: Prevent duplicate custom element registration in HA 25.x
  */
 class FlipClockCard extends HTMLElement {
     constructor() {
@@ -11,7 +24,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.0.4-beta';
+        this.version = '25.2.7';
     }
 
     /**
@@ -70,6 +83,18 @@ class FlipClockCard extends HTMLElement {
             return defaultValue;
         }
         return num;
+    }
+
+    /**
+     * Sanitize text content for safe rendering
+     * @param {string} text - Text to sanitize
+     * @returns {string} - Sanitized text
+     */
+    sanitizeText(text) {
+        if (typeof text !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**
@@ -140,7 +165,54 @@ class FlipClockCard extends HTMLElement {
             
             // Validate show_seconds (boolean)
             this.show_seconds = config?.show_seconds === true || config?.show_seconds === 'true';
+
+            // Validate timezone (IANA timezone identifier)
+            this.timezone = config?.timezone || null;
             
+            // Generate label from timezone string if it exists
+            if (this.timezone) {
+                const parts = this.timezone.split('/');
+                this.timezone_label = parts[parts.length - 1].replace(/_/g, ' ');
+                } else {
+                this.timezone_label = null;
+            }
+
+            // Validate show_label (boolean)
+            this.show_label = config?.show_label === true || config?.show_label === 'true';
+
+            // Validate label_position
+            const validPositions = ['right', 'left', 'top', 'bottom', 'right-vertical'];
+            this.label_position = validPositions.includes(config?.label_position) 
+                ? config.label_position 
+                : 'right';
+
+            // Validate label_size (pixels: 10-100)
+            this.label_size = this.validateNumber(config?.label_size, 10, 100, 24);
+
+            // Validate custom_label
+            this.custom_label = config?.custom_label ? this.sanitizeText(config.custom_label) : null;
+
+            // Validate am_pm_indicator (boolean) - Only relevant if time_format is 12
+            this.am_pm_indicator = (config?.am_pm_indicator === true || config?.am_pm_indicator === 'true') && this.time_format === '12';
+
+            // Validate am_pm_position
+            const validAmPmPositions = ['top', 'bottom', 'left', 'right', 'right-top', 'right-bottom', 'between'];
+            this.am_pm_position = validAmPmPositions.includes(config?.am_pm_position) 
+                ? config.am_pm_position 
+                : 'right';
+
+            // Validate am_pm_orientation (horizontal, vertical)
+            this.am_pm_orientation = config?.am_pm_orientation === 'vertical' ? 'vertical' : 'horizontal';
+
+            // Validate am_pm_distance (percentage of card size: 0-100)
+            this.am_pm_distance = this.validateNumber(config?.am_pm_distance, 0, 100, 15);
+
+            // Validate am_pm_size (percentage of card size: 10-100)
+            this.am_pm_size = this.validateNumber(config?.am_pm_size, 10, 100, 50);
+
+            // Validate am_pm_style (flip, text)
+            this.am_pm_style = (config?.am_pm_style === 'text') ? 'text' : 'flip';
+
             // Validate and sanitize animation_speed (0.1-2.0 seconds range)
             this.anim_speed = this.validateNumber(config?.animation_speed, 0.1, 2.0, 0.6);
             
@@ -156,6 +228,8 @@ class FlipClockCard extends HTMLElement {
                 this.content = null;
                 // Clear element cache on reconfiguration
                 this.digitElementsCache = {};
+                // Reset current digits state to force re-render of correct values
+                this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
                 // Stop observer and timer if reconfiguring the card
                 if (this.observer) this.observer.disconnect();
                 if (this.timer) clearInterval(this.timer);
@@ -171,6 +245,12 @@ class FlipClockCard extends HTMLElement {
             this.anim_speed = 0.6;
             this.theme = 'classic';
             this.custom_style = null;
+            this.timezone = null;
+            this.timezone_label = null;
+            this.show_label = false;
+            this.label_position = 'right';
+            this.label_size = 24;
+            this.custom_label = null;
             if (this.debug) {
                 console.error("FlipClockCard: Configuration error:", error);
             }
@@ -332,6 +412,8 @@ class FlipClockCard extends HTMLElement {
             const sanitizedLine = this.validateColor(t.line) || base.line;
             const sanitizedGlow = this.sanitizeCSSValue(t.glow) || base.glow;
 
+            const amPmDistance = this.validateNumber(this.am_pm_distance, 0, 100, 15);
+
             const style = document.createElement('style');
             style.textContent = `
                 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
@@ -347,6 +429,9 @@ class FlipClockCard extends HTMLElement {
                     --flip-line: ${sanitizedLine};
                     --flip-glow: ${sanitizedGlow};
                     --half-speed: ${sanitizedHalfSpeed}s; 
+                    --label-size: ${this.validateNumber(this.label_size, 10, 100, 24)}px; 
+                    --am-pm-distance: calc(var(--card-size) * ${amPmDistance} / 100);
+                    --am-pm-font-size: calc(var(--card-size) * ${this.validateNumber(this.am_pm_size, 10, 100, 50)} / 100);
                 }
                 .clock-container {
                     display: flex;
@@ -355,11 +440,100 @@ class FlipClockCard extends HTMLElement {
                     padding: 20px;
                     background: transparent;
                     perspective: 1000px;
+                    flex-direction: ${
+                        (this.label_position === 'top' || this.label_position === 'bottom') ||
+                        (this.am_pm_indicator && (this.am_pm_position === 'top' || this.am_pm_position === 'bottom'))
+                        ? 'column' : 'row'
+                    };
+                }
+                .clock-wrapper {
+                    display: flex;
+                    align-items: center;
+                    gap: calc(var(--card-size) * 0.15);
                 }
                 .digit-group {
                     display: flex;
                     gap: calc(var(--card-size) * 0.15);
                 }
+                
+                /* AM/PM STYLES */
+                .am-pm-container {
+                    display: flex;
+                    flex-direction: ${this.am_pm_orientation === 'vertical' ? 'column' : 'row'};
+                    gap: calc(var(--card-size) * 0.05);
+                    align-items: center;
+                    justify-content: center;
+                }
+                
+                .am-pm-container.pos-right, 
+                .am-pm-container.pos-right-top, 
+                .am-pm-container.pos-right-bottom {
+                     margin-left: var(--am-pm-distance);
+                }
+                
+                .am-pm-container.pos-left {
+                     margin-right: var(--am-pm-distance);
+                     order: -1; /* For flex ordering */
+                }
+                
+                .am-pm-container.pos-top {
+                     margin-bottom: var(--am-pm-distance);
+                     order: -2; /* Ensure it's above clock */
+                }
+                
+                .am-pm-container.pos-bottom {
+                     margin-top: var(--am-pm-distance);
+                     order: 2; /* Ensure it's below clock */
+                }
+
+                .am-pm-container.pos-right-top {
+                    align-self: flex-start;
+                }
+                
+                .am-pm-container.pos-right-bottom {
+                    align-self: flex-end;
+                }
+
+                .am-pm-container.pos-between {
+                    margin: 0;
+                    padding: 0 calc(var(--card-size) * 0.08);
+                }
+
+                .am-pm-container .flip-unit {
+                     width: calc(var(--am-pm-font-size) * 0.9);
+                     height: calc(var(--am-pm-font-size) * 1.3);
+                     font-size: var(--am-pm-font-size);
+                }
+                
+                .am-pm-container .upper span, 
+                .am-pm-container .lower span {
+                    line-height: calc(var(--am-pm-font-size) * 1.3);
+                }
+
+                /* Text-only AM/PM Style */
+                .am-pm-text {
+                    font-size: var(--am-pm-font-size);
+                    color: var(--flip-text);
+                    font-weight: 700;
+                    font-family: var(--flip-font);
+                    text-shadow: var(--flip-glow);
+                    padding: 0 4px;
+                    
+                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.8;` : ''}
+                    ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
+                }
+                
+                /* Vertical text style for AM/PM */
+                .am-pm-container.style-text.orientation-vertical .am-pm-text {
+                    writing-mode: vertical-rl;
+                    text-orientation: upright;
+                    letter-spacing: -0.1em;
+                }
+                
+                .am-pm-container.style-text {
+                    gap: 4px;
+                }
+
                 .separator {
                     font-size: calc(var(--card-size) * 0.6);
                     color: var(--flip-text);
@@ -372,6 +546,45 @@ class FlipClockCard extends HTMLElement {
                     /* Separator logic for Trek and Borg themes */
                     ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.8;` : ''}
                     ${this.theme === 'borg' ? `text-shadow: 0 0 10px ${sanitizedText};` : ''}
+                }
+
+                .timezone-label {
+                    font-size: var(--label-size);
+                    color: var(--flip-text);
+                    font-weight: 600;
+                    font-family: var(--flip-font);
+                    text-shadow: var(--flip-glow);
+                    opacity: 0.85;
+                    letter-spacing: 0.05em;
+
+                    ${(this.theme.startsWith('trek') && !this.custom_style) ? `color: ${sanitizedBg}; opacity: 0.7;` : ''}
+                    ${this.theme === 'borg' ? `text-shadow: 0 0 6px ${sanitizedText};` : ''}
+                }
+
+                .timezone-label.position-right {
+                    margin-left: calc(var(--card-size) * 0.25);
+                    padding-top: calc(var(--card-size) * 0.35);
+                }
+
+                .timezone-label.position-left {
+                    margin-right: calc(var(--card-size) * 0.25);
+                    padding-top: calc(var(--card-size) * 0.35);
+                    order: -1;
+                }
+
+                .timezone-label.position-top {
+                    margin-bottom: calc(var(--card-size) * 0.15);
+                }
+
+                .timezone-label.position-bottom {
+                    margin-top: calc(var(--card-size) * 0.15);
+                }
+
+                .timezone-label.position-right-vertical {
+                    margin-left: calc(var(--card-size) * 0.25);
+                    writing-mode: vertical-rl;
+                    text-orientation: mixed;
+                    padding-top: 0;
                 }
 
                 .flip-unit {
@@ -484,21 +697,22 @@ class FlipClockCard extends HTMLElement {
             const container = document.createElement('div');
             container.className = 'clock-container';
             
-            const createDigitHtml = (id) => `
+            const createDigitHtml = (id, initialValue = '0') => `
                 <div class="flip-unit" id="${id}">
-                    <div class="upper upper-back"><span>0</span></div>
-                    <div class="lower lower-back"><span>0</span></div>
-                    <div class="upper flip-card"><span>0</span></div>
-                    <div class="lower flip-card"><span>0</span></div>
+                    <div class="upper upper-back"><span>${initialValue}</span></div>
+                    <div class="lower lower-back"><span>${initialValue}</span></div>
+                    <div class="upper flip-card"><span>${initialValue}</span></div>
+                    <div class="lower flip-card"><span>${initialValue}</span></div>
                 </div>
             `;
 
-            let html = `
+            // Build clock HTML
+            let clockDigitsHtml = `
                 <div class="digit-group">
                     ${createDigitHtml('h1')}
                     ${createDigitHtml('h2')}
                 </div>
-                <div class="separator">:</div>
+                <div class="separator" id="hour-minute-separator">:</div>
                 <div class="digit-group">
                     ${createDigitHtml('m1')}
                     ${createDigitHtml('m2')}
@@ -506,13 +720,128 @@ class FlipClockCard extends HTMLElement {
             `;
 
             if (this.show_seconds) {
-                html += `
+                clockDigitsHtml += `
                     <div class="separator">:</div>
                     <div class="digit-group">
                         ${createDigitHtml('s1')}
                         ${createDigitHtml('s2')}
                     </div>
                 `;
+            }
+
+            // Generate AM/PM HTML if enabled
+            let amPmHtml = '';
+            if (this.am_pm_indicator) {
+                // Determine initial AM/PM (approximation, updated immediately by timer)
+                // We use 'ap1' and 'ap2' for flip digits regardless of style for simpler logic
+                // But for text style we render a span instead
+                
+                const orientationClass = this.am_pm_orientation === 'vertical' ? 'orientation-vertical' : '';
+                
+                if (this.am_pm_style === 'flip') {
+                    amPmHtml = `
+                        <div class="am-pm-container style-flip pos-${this.am_pm_position} ${orientationClass}">
+                            ${createDigitHtml('ap1', 'A')}
+                            ${createDigitHtml('ap2', 'M')}
+                        </div>
+                    `;
+                } else {
+                    // Text style
+                    amPmHtml = `
+                        <div class="am-pm-container style-text pos-${this.am_pm_position} ${orientationClass}">
+                            <div class="am-pm-text" id="ap-text">AM</div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Integrate AM/PM into clock content based on position
+            let clockContentHtml = clockDigitsHtml;
+            const isSidePosition = ['left', 'right', 'right-top', 'right-bottom'].includes(this.am_pm_position);
+            
+            if (this.am_pm_indicator) {
+                if (this.am_pm_position === 'between') {
+                    // Replace the hour-minute separator with AM/PM indicator
+                    clockContentHtml = clockDigitsHtml.replace(
+                        '<div class="separator" id="hour-minute-separator">:</div>',
+                        amPmHtml
+                    );
+                } else if (isSidePosition) {
+                    if (this.am_pm_position === 'left') {
+                        clockContentHtml = amPmHtml + clockContentHtml;
+                    } else {
+                        clockContentHtml = clockContentHtml + amPmHtml;
+                    }
+                }
+            }
+
+            // Wrap in clock-wrapper
+            let mainHtml = `<div class="clock-wrapper">${clockContentHtml}</div>`;
+
+            // Integrate AM/PM if position is top/bottom
+            if (this.am_pm_indicator && !isSidePosition && this.am_pm_position !== 'between') {
+                if (this.am_pm_position === 'top') {
+                    mainHtml = amPmHtml + mainHtml;
+                } else if (this.am_pm_position === 'bottom') {
+                    mainHtml = mainHtml + amPmHtml;
+                }
+            }
+
+            // Determine label to display
+            // Priority: custom_label > timezone_label
+            let labelText = '';
+            if (this.show_label) {
+                if (this.custom_label) {
+                    labelText = this.custom_label;
+                } else if (this.timezone_label) {
+                    labelText = this.sanitizeText(this.timezone_label);
+                }
+            }
+
+            // Build final HTML based on label position
+            let html = '';
+            if (this.label_position === 'top' && labelText) {
+                html = `
+                    <div class="timezone-label position-top">${labelText}</div>
+                    ${mainHtml}
+                `;
+            } else if (this.label_position === 'bottom' && labelText) {
+                html = `
+                    ${mainHtml}
+                    <div class="timezone-label position-bottom">${labelText}</div>
+                `;
+            } else {
+                // left, right, right-vertical
+                // If label is side, mainHtml (clock-wrapper [+ am/pm vertical]) is one block.
+                // But wait, if am/pm is top/bottom, mainHtml contains multiple divs.
+                // clock-wrapper handles the flex row for digits.
+                // If label is side, we expect a flex-row container (clock-container) to hold label + main content.
+                // But if mainHtml has multiple blocks (AM/PM top + Clock), we need to wrap them so they stay together relative to the label?
+                // Or let them stack?
+                // If label is 'right', we want: [ [AM/PM] [Clock] ] [Label] ? No.
+                // If AM/PM is top:
+                // [AM/PM]
+                // [Clock]
+                // [Label] (Right)
+                
+                // If we want label on right of the whole group, we need a wrapper around Main content.
+                
+                const wrappedMain = (this.am_pm_indicator && !isSidePosition) 
+                    ? `<div style="display:flex; flex-direction:column; align-items:center;">${mainHtml}</div>` 
+                    : mainHtml;
+
+                if (labelText) {
+                     if (this.label_position === 'left') {
+                        html = `<div class="timezone-label position-left">${labelText}</div>${wrappedMain}`;
+                     } else if (this.label_position === 'right-vertical') {
+                        html = `${wrappedMain}<div class="timezone-label position-right-vertical">${labelText}</div>`;
+                     } else {
+                        // right
+                        html = `${wrappedMain}<div class="timezone-label position-right">${labelText}</div>`;
+                     }
+                } else {
+                    html = wrappedMain;
+                }
             }
 
             container.innerHTML = html;
@@ -544,6 +873,9 @@ class FlipClockCard extends HTMLElement {
         if (this.show_seconds) {
             digitIds.push('s1', 's2');
         }
+        if (this.am_pm_indicator && this.am_pm_style === 'flip') {
+            digitIds.push('ap1', 'ap2');
+        }
         
         digitIds.forEach(id => {
             const el = this.shadowRoot.getElementById(id);
@@ -572,13 +904,48 @@ class FlipClockCard extends HTMLElement {
         const update = () => {
             try {
                 const now = new Date();
-                let h = now.getHours();
+                let h, m, s;
+
+                // Use timezone if specified, otherwise local time
+                if (this.timezone) {
+                    // Use specified timezone
+                    try {
+                        const formatter = new Intl.DateTimeFormat('en-US', {
+                            timeZone: this.timezone,
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            second: 'numeric',
+                            hour12: false
+                        });
+                        const parts = formatter.formatToParts(now);
+                        h = parseInt(parts.find(p => p.type === 'hour').value);
+                        m = parseInt(parts.find(p => p.type === 'minute').value);
+                        s = parseInt(parts.find(p => p.type === 'second').value);
+                    } catch (tzError) {
+                        // Fallback to local time if timezone is invalid
+                        if (this.debug) {
+                            console.error("FlipClockCard: Invalid timezone, falling back to local time:", tzError);
+                        }
+                        h = now.getHours();
+                        m = now.getMinutes();
+                        s = now.getSeconds();
+                    }
+                } else {
+                    h = now.getHours();
+                    m = now.getMinutes();
+                    s = now.getSeconds();
+                }
+
                 // 12-hour format logic
-                if (this.time_format === '12') h = h % 12 || 12;
-                
+                let isPm = false;
+                if (this.time_format === '12') {
+                    isPm = h >= 12;
+                    h = h % 12 || 12;
+                }
+
                 const hStr = String(h).padStart(2, '0');
-                const mStr = String(now.getMinutes()).padStart(2, '0');
-                const sStr = String(now.getSeconds()).padStart(2, '0');
+                const mStr = String(m).padStart(2, '0');
+                const sStr = String(s).padStart(2, '0');
                 
                 this.updateDigit('h1', hStr[0]);
                 this.updateDigit('h2', hStr[1]);
@@ -588,6 +955,22 @@ class FlipClockCard extends HTMLElement {
                 if (this.show_seconds) {
                     this.updateDigit('s1', sStr[0]);
                     this.updateDigit('s2', sStr[1]);
+                }
+
+                if (this.am_pm_indicator) {
+                    const amPmText = isPm ? 'PM' : 'AM';
+                    
+                    if (this.am_pm_style === 'flip') {
+                        this.updateDigit('ap1', amPmText[0]);
+                        this.updateDigit('ap2', amPmText[1]);
+                    } else {
+                        // Update text directly
+                         if (!this.shadowRoot) return;
+                         const textEl = this.shadowRoot.getElementById('ap-text');
+                         if (textEl && textEl.textContent !== amPmText) {
+                             textEl.textContent = amPmText;
+                         }
+                    }
                 }
             } catch (error) {
                 if (this.debug) {
@@ -778,7 +1161,18 @@ class FlipClockCard extends HTMLElement {
             time_format: '24',
             show_seconds: false,
             animation_speed: 0.6,
-            theme: 'classic'
+            theme: 'classic',
+            timezone: null,
+            show_label: false,
+            label_position: 'right',
+            label_size: 24,
+            custom_label: '',
+            am_pm_indicator: false,
+            am_pm_position: 'right',
+            am_pm_orientation: 'horizontal',
+            am_pm_distance: 15,
+            am_pm_size: 50,
+            am_pm_style: 'flip'
         };
     }
 
@@ -798,7 +1192,15 @@ window.customCards.push({
 
 class FlipClockCardEditor extends HTMLElement {
     setConfig(config) {
-        this._config = config;
+        // Clone config to avoid modifying the original frozen object
+        this._config = { ...config };
+        
+        // Ensure defaults for optional fields if not present, to avoid UI glitches
+        if (!this._config.am_pm_position) this._config.am_pm_position = 'right';
+        if (!this._config.am_pm_orientation) this._config.am_pm_orientation = 'horizontal';
+        if (this._config.am_pm_distance === undefined) this._config.am_pm_distance = 15;
+        if (this._config.am_pm_size === undefined) this._config.am_pm_size = 50;
+        if (!this._config.am_pm_style) this._config.am_pm_style = 'flip';
         this.render();
     }
 
@@ -809,6 +1211,17 @@ class FlipClockCardEditor extends HTMLElement {
         });
         event.detail = { config: newConfig };
         this.dispatchEvent(event);
+    }
+
+    getTimezoneMatch(value, label) {
+        if (!this._config.timezone) return false;
+        if (typeof this._config.timezone === 'string') {
+            return this._config.timezone === value && !label;
+        }
+        if (typeof this._config.timezone === 'object') {
+            return this._config.timezone.value === value && this._config.timezone.label === label;
+        }
+        return false;
     }
 
     render() {
@@ -850,9 +1263,193 @@ class FlipClockCardEditor extends HTMLElement {
                         <option value="12" ${this._config.time_format === '12' ? 'selected' : ''}>12h</option>
                     </select>
                 </div>
+                
+                ${this._config.time_format === '12' ? `
+                <div class="option">
+                    <label class="label">Show AM/PM</label>
+                    <input type="checkbox" class="value" id="am_pm_indicator" ${this._config.am_pm_indicator ? 'checked' : ''}>
+                </div>
+                ` : ''}
+
+                ${this._config.time_format === '12' && this._config.am_pm_indicator ? `
+                <div class="option">
+                    <label class="label">AM/PM Style</label>
+                    <select class="value" id="am_pm_style">
+                        <option value="flip" ${(!this._config.am_pm_style || this._config.am_pm_style === 'flip') ? 'selected' : ''}>Flip</option>
+                        <option value="text" ${this._config.am_pm_style === 'text' ? 'selected' : ''}>Text</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Position</label>
+                    <select class="value" id="am_pm_position">
+                        <option value="right" ${(!this._config.am_pm_position || this._config.am_pm_position === 'right') ? 'selected' : ''}>Right</option>
+                        <option value="left" ${this._config.am_pm_position === 'left' ? 'selected' : ''}>Left</option>
+                        <option value="top" ${this._config.am_pm_position === 'top' ? 'selected' : ''}>Top</option>
+                        <option value="bottom" ${this._config.am_pm_position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                        <option value="between" ${this._config.am_pm_position === 'between' ? 'selected' : ''}>Between (replaces :)</option>
+                        <option value="right-top" ${this._config.am_pm_position === 'right-top' ? 'selected' : ''}>Right Top</option>
+                        <option value="right-bottom" ${this._config.am_pm_position === 'right-bottom' ? 'selected' : ''}>Right Bottom</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Orientation</label>
+                    <select class="value" id="am_pm_orientation">
+                        <option value="horizontal" ${(!this._config.am_pm_orientation || this._config.am_pm_orientation === 'horizontal') ? 'selected' : ''}>Horizontal</option>
+                        <option value="vertical" ${this._config.am_pm_orientation === 'vertical' ? 'selected' : ''}>Vertical</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Distance (%)</label>
+                    <input type="number" min="0" max="100" class="value" id="am_pm_distance" value="${this._config.am_pm_distance !== undefined ? this._config.am_pm_distance : 15}">
+                </div>
+                <div class="option">
+                    <label class="label">AM/PM Size (%)</label>
+                    <input type="number" min="10" max="100" class="value" id="am_pm_size" value="${this._config.am_pm_size !== undefined ? this._config.am_pm_size : 50}">
+                </div>
+                ` : ''}
+
                 <div class="option">
                     <label class="label">Show Seconds</label>
                     <input type="checkbox" class="value" id="show_seconds" ${this._config.show_seconds ? 'checked' : ''}>
+                </div>
+                <div class="option">
+                    <label class="label">Show Label</label>
+                    <input type="checkbox" class="value" id="show_label" ${this._config.show_label ? 'checked' : ''}>
+                </div>
+                ${this._config.show_label ? `
+                <div class="option">
+                    <label class="label">Custom Label</label>
+                    <input type="text" class="value" id="custom_label" value="${this._config.custom_label || ''}" placeholder="Optional (overrides timezone)">
+                </div>
+                <div class="option">
+                    <label class="label">Label Position</label>
+                    <select class="value" id="label_position">
+                        <option value="right" ${(!this._config.label_position || this._config.label_position === 'right') ? 'selected' : ''}>Right (Horizontal)</option>
+                        <option value="left" ${this._config.label_position === 'left' ? 'selected' : ''}>Left (Horizontal)</option>
+                        <option value="top" ${this._config.label_position === 'top' ? 'selected' : ''}>Top</option>
+                        <option value="bottom" ${this._config.label_position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                        <option value="right-vertical" ${this._config.label_position === 'right-vertical' ? 'selected' : ''}>Right (Vertical)</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label class="label">Label Size (px)</label>
+                    <input type="number" min="10" max="100" step="1" class="value" id="label_size" value="${this._config.label_size || 24}">
+                </div>
+                ` : ''}
+                <div class="option">
+                    <label class="label">Timezone</label>
+                    <select class="value" id="timezone">
+                        <option value="null" ${!this._config.timezone ? 'selected' : ''}>Local Time</option>
+                        <optgroup label="UTC">
+                            <option value="UTC" ${this._config.timezone === 'UTC' ? 'selected' : ''}>UTC</option>
+                        </optgroup>
+                        <optgroup label="Africa">
+                            <option value="Africa/Abidjan" ${this._config.timezone === 'Africa/Abidjan' ? 'selected' : ''}>Abidjan</option>
+                            <option value="Africa/Accra" ${this._config.timezone === 'Africa/Accra' ? 'selected' : ''}>Accra</option>
+                            <option value="Africa/Addis_Ababa" ${this._config.timezone === 'Africa/Addis_Ababa' ? 'selected' : ''}>Addis Ababa</option>
+                            <option value="Africa/Algiers" ${this._config.timezone === 'Africa/Algiers' ? 'selected' : ''}>Algiers</option>
+                            <option value="Africa/Cairo" ${this._config.timezone === 'Africa/Cairo' ? 'selected' : ''}>Cairo</option>
+                            <option value="Africa/Casablanca" ${this._config.timezone === 'Africa/Casablanca' ? 'selected' : ''}>Casablanca</option>
+                            <option value="Africa/Johannesburg" ${this._config.timezone === 'Africa/Johannesburg' ? 'selected' : ''}>Johannesburg</option>
+                            <option value="Africa/Lagos" ${this._config.timezone === 'Africa/Lagos' ? 'selected' : ''}>Lagos</option>
+                            <option value="Africa/Nairobi" ${this._config.timezone === 'Africa/Nairobi' ? 'selected' : ''}>Nairobi</option>
+                            <option value="Africa/Tunis" ${this._config.timezone === 'Africa/Tunis' ? 'selected' : ''}>Tunis</option>
+                        </optgroup>
+                        <optgroup label="America - North">
+                            <option value="America/Anchorage" ${this._config.timezone === 'America/Anchorage' ? 'selected' : ''}>Anchorage</option>
+                            <option value="America/Chicago" ${this._config.timezone === 'America/Chicago' ? 'selected' : ''}>Chicago</option>
+                            <option value="America/Denver" ${this._config.timezone === 'America/Denver' ? 'selected' : ''}>Denver</option>
+                            <option value="America/Los_Angeles" ${this._config.timezone === 'America/Los_Angeles' ? 'selected' : ''}>Los Angeles</option>
+                            <option value="America/Mexico_City" ${this._config.timezone === 'America/Mexico_City' ? 'selected' : ''}>Mexico City</option>
+                            <option value="America/New_York" ${this._config.timezone === 'America/New_York' ? 'selected' : ''}>New York</option>
+                            <option value="America/Phoenix" ${this._config.timezone === 'America/Phoenix' ? 'selected' : ''}>Phoenix</option>
+                            <option value="America/Toronto" ${this._config.timezone === 'America/Toronto' ? 'selected' : ''}>Toronto</option>
+                            <option value="America/Vancouver" ${this._config.timezone === 'America/Vancouver' ? 'selected' : ''}>Vancouver</option>
+                        </optgroup>
+                        <optgroup label="America - South & Central">
+                            <option value="America/Argentina/Buenos_Aires" ${this._config.timezone === 'America/Argentina/Buenos_Aires' ? 'selected' : ''}>Buenos Aires</option>
+                            <option value="America/Bogota" ${this._config.timezone === 'America/Bogota' ? 'selected' : ''}>Bogota</option>
+                            <option value="America/Caracas" ${this._config.timezone === 'America/Caracas' ? 'selected' : ''}>Caracas</option>
+                            <option value="America/Lima" ${this._config.timezone === 'America/Lima' ? 'selected' : ''}>Lima</option>
+                            <option value="America/Santiago" ${this._config.timezone === 'America/Santiago' ? 'selected' : ''}>Santiago</option>
+                            <option value="America/Sao_Paulo" ${this._config.timezone === 'America/Sao_Paulo' ? 'selected' : ''}>São Paulo</option>
+                        </optgroup>
+                        <optgroup label="Asia - East">
+                            <option value="Asia/Bangkok" ${this._config.timezone === 'Asia/Bangkok' ? 'selected' : ''}>Bangkok</option>
+                            <option value="Asia/Hong_Kong" ${this._config.timezone === 'Asia/Hong_Kong' ? 'selected' : ''}>Hong Kong</option>
+                            <option value="Asia/Jakarta" ${this._config.timezone === 'Asia/Jakarta' ? 'selected' : ''}>Jakarta</option>
+                            <option value="Asia/Kuala_Lumpur" ${this._config.timezone === 'Asia/Kuala_Lumpur' ? 'selected' : ''}>Kuala Lumpur</option>
+                            <option value="Asia/Manila" ${this._config.timezone === 'Asia/Manila' ? 'selected' : ''}>Manila</option>
+                            <option value="Asia/Seoul" ${this._config.timezone === 'Asia/Seoul' ? 'selected' : ''}>Seoul</option>
+                            <option value="Asia/Shanghai" ${this._config.timezone === 'Asia/Shanghai' ? 'selected' : ''}>Shanghai</option>
+                            <option value="Asia/Singapore" ${this._config.timezone === 'Asia/Singapore' ? 'selected' : ''}>Singapore</option>
+                            <option value="Asia/Taipei" ${this._config.timezone === 'Asia/Taipei' ? 'selected' : ''}>Taipei</option>
+                            <option value="Asia/Tokyo" ${this._config.timezone === 'Asia/Tokyo' ? 'selected' : ''}>Tokyo</option>
+                        </optgroup>
+                        <optgroup label="Asia - Middle East & Central">
+                            <option value="Asia/Dubai" ${this._config.timezone === 'Asia/Dubai' ? 'selected' : ''}>Dubai</option>
+                            <option value="Asia/Jerusalem" ${this._config.timezone === 'Asia/Jerusalem' ? 'selected' : ''}>Jerusalem</option>
+                            <option value="Asia/Karachi" ${this._config.timezone === 'Asia/Karachi' ? 'selected' : ''}>Karachi</option>
+                            <option value="Asia/Kolkata" ${this._config.timezone === 'Asia/Kolkata' ? 'selected' : ''}>Kolkata</option>
+                            <option value="Asia/Riyadh" ${this._config.timezone === 'Asia/Riyadh' ? 'selected' : ''}>Riyadh</option>
+                            <option value="Asia/Tehran" ${this._config.timezone === 'Asia/Tehran' ? 'selected' : ''}>Tehran</option>
+                        </optgroup>
+                        <optgroup label="Asia - Siberia & Far East">
+                            <option value="Asia/Vladivostok" ${this._config.timezone === 'Asia/Vladivostok' ? 'selected' : ''}>Vladivostok</option>
+                            <option value="Asia/Yakutsk" ${this._config.timezone === 'Asia/Yakutsk' ? 'selected' : ''}>Yakutsk</option>
+                            <option value="Asia/Yekaterinburg" ${this._config.timezone === 'Asia/Yekaterinburg' ? 'selected' : ''}>Yekaterinburg</option>
+                        </optgroup>
+                        <optgroup label="Atlantic">
+                            <option value="Atlantic/Azores" ${this._config.timezone === 'Atlantic/Azores' ? 'selected' : ''}>Azores</option>
+                            <option value="Atlantic/Cape_Verde" ${this._config.timezone === 'Atlantic/Cape_Verde' ? 'selected' : ''}>Cape Verde</option>
+                            <option value="Atlantic/Reykjavik" ${this._config.timezone === 'Atlantic/Reykjavik' ? 'selected' : ''}>Reykjavik</option>
+                        </optgroup>
+                        <optgroup label="Australia & Pacific">
+                            <option value="Australia/Adelaide" ${this._config.timezone === 'Australia/Adelaide' ? 'selected' : ''}>Adelaide</option>
+                            <option value="Australia/Brisbane" ${this._config.timezone === 'Australia/Brisbane' ? 'selected' : ''}>Brisbane</option>
+                            <option value="Australia/Darwin" ${this._config.timezone === 'Australia/Darwin' ? 'selected' : ''}>Darwin</option>
+                            <option value="Australia/Melbourne" ${this._config.timezone === 'Australia/Melbourne' ? 'selected' : ''}>Melbourne</option>
+                            <option value="Australia/Perth" ${this._config.timezone === 'Australia/Perth' ? 'selected' : ''}>Perth</option>
+                            <option value="Australia/Sydney" ${this._config.timezone === 'Australia/Sydney' ? 'selected' : ''}>Sydney</option>
+                            <option value="Pacific/Auckland" ${this._config.timezone === 'Pacific/Auckland' ? 'selected' : ''}>Auckland</option>
+                            <option value="Pacific/Fiji" ${this._config.timezone === 'Pacific/Fiji' ? 'selected' : ''}>Fiji</option>
+                            <option value="Pacific/Guam" ${this._config.timezone === 'Pacific/Guam' ? 'selected' : ''}>Guam</option>
+                            <option value="Pacific/Honolulu" ${this._config.timezone === 'Pacific/Honolulu' ? 'selected' : ''}>Honolulu</option>
+                            <option value="Pacific/Tahiti" ${this._config.timezone === 'Pacific/Tahiti' ? 'selected' : ''}>Tahiti</option>
+                        </optgroup>
+                        <optgroup label="Europe - West">
+                            <option value="Europe/Dublin" ${this._config.timezone === 'Europe/Dublin' ? 'selected' : ''}>Dublin</option>
+                            <option value="Europe/Lisbon" ${this._config.timezone === 'Europe/Lisbon' ? 'selected' : ''}>Lisbon</option>
+                            <option value="Europe/London" ${this._config.timezone === 'Europe/London' ? 'selected' : ''}>London</option>
+                        </optgroup>
+                        <optgroup label="Europe - Central">
+                            <option value="Europe/Amsterdam" ${this._config.timezone === 'Europe/Amsterdam' ? 'selected' : ''}>Amsterdam</option>
+                            <option value="Europe/Berlin" ${this._config.timezone === 'Europe/Berlin' ? 'selected' : ''}>Berlin</option>
+                            <option value="Europe/Brussels" ${this._config.timezone === 'Europe/Brussels' ? 'selected' : ''}>Brussels</option>
+                            <option value="Europe/Copenhagen" ${this._config.timezone === 'Europe/Copenhagen' ? 'selected' : ''}>Copenhagen</option>
+                            <option value="Europe/Madrid" ${this._config.timezone === 'Europe/Madrid' ? 'selected' : ''}>Madrid</option>
+                            <option value="Europe/Oslo" ${this._config.timezone === 'Europe/Oslo' ? 'selected' : ''}>Oslo</option>
+                            <option value="Europe/Paris" ${this._config.timezone === 'Europe/Paris' ? 'selected' : ''}>Paris</option>
+                            <option value="Europe/Prague" ${this._config.timezone === 'Europe/Prague' ? 'selected' : ''}>Prague</option>
+                            <option value="Europe/Rome" ${this._config.timezone === 'Europe/Rome' ? 'selected' : ''}>Rome</option>
+                            <option value="Europe/Stockholm" ${this._config.timezone === 'Europe/Stockholm' ? 'selected' : ''}>Stockholm</option>
+                            <option value="Europe/Vienna" ${this._config.timezone === 'Europe/Vienna' ? 'selected' : ''}>Vienna</option>
+                            <option value="Europe/Warsaw" ${this._config.timezone === 'Europe/Warsaw' ? 'selected' : ''}>Warsaw</option>
+                            <option value="Europe/Zurich" ${this._config.timezone === 'Europe/Zurich' ? 'selected' : ''}>Zurich</option>
+                        </optgroup>
+                        <optgroup label="Europe - East">
+                            <option value="Europe/Athens" ${this._config.timezone === 'Europe/Athens' ? 'selected' : ''}>Athens</option>
+                            <option value="Europe/Bucharest" ${this._config.timezone === 'Europe/Bucharest' ? 'selected' : ''}>Bucharest</option>
+                            <option value="Europe/Helsinki" ${this._config.timezone === 'Europe/Helsinki' ? 'selected' : ''}>Helsinki</option>
+                            <option value="Europe/Istanbul" ${this._config.timezone === 'Europe/Istanbul' ? 'selected' : ''}>Istanbul</option>
+                            <option value="Europe/Kiev" ${this._config.timezone === 'Europe/Kiev' ? 'selected' : ''}>Kiev</option>
+                            <option value="Europe/Moscow" ${this._config.timezone === 'Europe/Moscow' ? 'selected' : ''}>Moscow</option>
+                            <option value="Europe/Riga" ${this._config.timezone === 'Europe/Riga' ? 'selected' : ''}>Riga</option>
+                            <option value="Europe/Sofia" ${this._config.timezone === 'Europe/Sofia' ? 'selected' : ''}>Sofia</option>
+                            <option value="Europe/Tallinn" ${this._config.timezone === 'Europe/Tallinn' ? 'selected' : ''}>Tallinn</option>
+                            <option value="Europe/Vilnius" ${this._config.timezone === 'Europe/Vilnius' ? 'selected' : ''}>Vilnius</option>
+                        </optgroup>
+                    </select>
                 </div>
                 <style>
                     .card-config { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
@@ -860,6 +1457,7 @@ class FlipClockCardEditor extends HTMLElement {
                     .label { font-weight: bold; margin-right: 16px; }
                     .value { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
                     input[type="number"], select { width: 150px; }
+                    select#timezone { width: 200px; }
                 </style>
             </div>
         `;
@@ -871,7 +1469,16 @@ class FlipClockCardEditor extends HTMLElement {
                 let value = target.value;
                 if (target.type === 'checkbox') value = target.checked;
                 if (target.type === 'number') value = Number(value);
-                
+
+                // Special handling for utc_label and timezone
+                if ((prop === 'utc_label' || prop === 'timezone') && value === 'null') {
+                        value = null;
+                }
+
+                if (prop === 'custom_label' && value === '') {
+                    value = null;
+                }
+
                 const newConfig = { ...this._config, [prop]: value };
                 this.configChanged(newConfig);
             });
@@ -879,6 +1486,12 @@ class FlipClockCardEditor extends HTMLElement {
     }
 }
 
-customElements.define("flip-clock-card-editor", FlipClockCardEditor);
+// Prevent duplicate registration in Home Assistant 25.x
+// Check if custom elements are already defined before registering
+if (!customElements.get("flip-clock-card-editor")) {
+    customElements.define("flip-clock-card-editor", FlipClockCardEditor);
+}
 
-customElements.define('flip-clock-card', FlipClockCard);
+if (!customElements.get('flip-clock-card')) {
+    customElements.define('flip-clock-card', FlipClockCard);
+}
