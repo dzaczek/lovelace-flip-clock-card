@@ -1,6 +1,6 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.6-beta5
+ * Version: 25.2.6-beta6
  * A retro-style flip clock card with 3D animations
  * New: Added AM/PM indicator with extensive customization
  * New: AM/PM positioning (top, bottom, left, right, corners)
@@ -20,7 +20,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '25.2.6-beta5';
+        this.version = '25.2.6-beta6';
     }
 
     /**
@@ -182,8 +182,11 @@ class FlipClockCard extends HTMLElement {
                 ? config.label_position 
                 : 'right';
 
-            // Validate label_size (percentage of card size: 20-100)
-            this.label_size = this.validateNumber(config?.label_size, 20, 100, 35);
+            // Validate label_size (pixels: 10-100)
+            this.label_size = this.validateNumber(config?.label_size, 10, 100, 24);
+
+            // Validate custom_label
+            this.custom_label = config?.custom_label ? this.sanitizeText(config.custom_label) : null;
 
             // Validate am_pm_indicator (boolean) - Only relevant if time_format is 12
             this.am_pm_indicator = (config?.am_pm_indicator === true || config?.am_pm_indicator === 'true') && this.time_format === '12';
@@ -242,7 +245,8 @@ class FlipClockCard extends HTMLElement {
             this.timezone_label = null;
             this.show_label = false;
             this.label_position = 'right';
-            this.label_size = 35;
+            this.label_size = 24;
+            this.custom_label = null;
             if (this.debug) {
                 console.error("FlipClockCard: Configuration error:", error);
             }
@@ -421,7 +425,7 @@ class FlipClockCard extends HTMLElement {
                     --flip-line: ${sanitizedLine};
                     --flip-glow: ${sanitizedGlow};
                     --half-speed: ${sanitizedHalfSpeed}s; 
-                    --label-size: ${this.validateNumber(this.label_size, 20, 100, 35)}; 
+                    --label-size: ${this.validateNumber(this.label_size, 10, 100, 24)}px; 
                     --am-pm-distance: calc(var(--card-size) * ${amPmDistance} / 100);
                     --am-pm-font-size: calc(var(--card-size) * ${this.validateNumber(this.am_pm_size, 10, 100, 50)} / 100);
                 }
@@ -529,7 +533,7 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 .timezone-label {
-                    font-size: calc(var(--card-size) * var(--label-size) / 100);
+                    font-size: var(--label-size);
                     color: var(--flip-text);
                     font-weight: 600;
                     font-family: var(--flip-font);
@@ -758,7 +762,15 @@ class FlipClockCard extends HTMLElement {
             }
 
             // Determine label to display
-            const labelText = this.show_label && this.timezone_label ? this.sanitizeText(this.timezone_label) : '';
+            // Priority: custom_label > timezone_label
+            let labelText = '';
+            if (this.show_label) {
+                if (this.custom_label) {
+                    labelText = this.custom_label;
+                } else if (this.timezone_label) {
+                    labelText = this.sanitizeText(this.timezone_label);
+                }
+            }
 
             // Build final HTML based on label position
             let html = '';
@@ -1127,7 +1139,8 @@ class FlipClockCard extends HTMLElement {
             timezone: null,
             show_label: false,
             label_position: 'right',
-            label_size: 35,
+            label_size: 24,
+            custom_label: '',
             am_pm_indicator: false,
             am_pm_position: 'right',
             am_pm_orientation: 'horizontal',
@@ -1276,6 +1289,11 @@ class FlipClockCardEditor extends HTMLElement {
                     <label class="label">Show Label</label>
                     <input type="checkbox" class="value" id="show_label" ${this._config.show_label ? 'checked' : ''}>
                 </div>
+                ${this._config.show_label ? `
+                <div class="option">
+                    <label class="label">Custom Label</label>
+                    <input type="text" class="value" id="custom_label" value="${this._config.custom_label || ''}" placeholder="Optional (overrides timezone)">
+                </div>
                 <div class="option">
                     <label class="label">Label Position</label>
                     <select class="value" id="label_position">
@@ -1287,9 +1305,10 @@ class FlipClockCardEditor extends HTMLElement {
                     </select>
                 </div>
                 <div class="option">
-                    <label class="label">Label Size (%)</label>
-                    <input type="number" min="20" max="100" step="5" class="value" id="label_size" value="${this._config.label_size || 35}">
+                    <label class="label">Label Size (px)</label>
+                    <input type="number" min="10" max="100" step="1" class="value" id="label_size" value="${this._config.label_size || 24}">
                 </div>
+                ` : ''}
                 <div class="option">
                     <label class="label">Timezone</label>
                     <select class="value" id="timezone">
@@ -1427,6 +1446,10 @@ class FlipClockCardEditor extends HTMLElement {
                 // Special handling for utc_label and timezone
                 if ((prop === 'utc_label' || prop === 'timezone') && value === 'null') {
                         value = null;
+                }
+
+                if (prop === 'custom_label' && value === '') {
+                    value = null;
                 }
 
                 const newConfig = { ...this._config, [prop]: value };
