@@ -1,5 +1,7 @@
 {
   "name": "Flip Clock Card",
+  "content_in_root": true,
+  "filename": "flip-clock-card.js",
   "render_readme": true,
-  "filename": "flip-clock-card.js"
+  "homeassistant": "2021.1.0"
 }
