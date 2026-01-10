@@ -71,6 +71,7 @@ jobs:
           files: |
             dist/flip-clock-card-*.zip
             dist/flip-clock-card-*.tar.gz
+            flip-clock-card.js
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') || contains(github.ref, '-alpha') }}
         env:
