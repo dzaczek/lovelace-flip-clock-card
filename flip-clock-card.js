@@ -420,6 +420,7 @@ class FlipClockCard extends HTMLElement {
                 
                 :host {
                     display: block;
+                    -webkit-font-smoothing: antialiased;
                     --card-size: ${sanitizedCardSize}px;
                     --flip-bg: ${sanitizedBg};
                     --flip-text: ${sanitizedText};
@@ -599,6 +600,7 @@ class FlipClockCard extends HTMLElement {
                     color: var(--flip-text);
                     box-shadow: var(--flip-shadow);
                     text-shadow: var(--flip-glow);
+                    -webkit-transform-style: preserve-3d;
                     transform-style: preserve-3d;
                 }
 
@@ -611,6 +613,8 @@ class FlipClockCard extends HTMLElement {
                     background: var(--flip-bg);
                     -webkit-backface-visibility: hidden;
                     backface-visibility: hidden;
+                    -webkit-transform: translateZ(0);
+                    transform: translateZ(0);
                 }
 
                 /* BORG SPECIAL BORDER */
@@ -655,17 +659,24 @@ class FlipClockCard extends HTMLElement {
                     background: var(--flip-line);
                 }
 
-                .upper-back, .lower-back { z-index: 1; }
+                .upper-back, .lower-back {
+                    z-index: 1;
+                    -webkit-transform: translateZ(0);
+                    transform: translateZ(0);
+                }
                 
                 .upper.flip-card { 
                     z-index: 10; 
                     transform-origin: bottom;
+                    -webkit-transform: rotateX(0deg) translateZ(0.1px);
+                    transform: rotateX(0deg) translateZ(0.1px);
                     will-change: transform;
                 }
                 .lower.flip-card { 
                     z-index: 10; 
                     transform-origin: top; 
-                    transform: rotateX(90deg);
+                    -webkit-transform: rotateX(90deg) translateZ(0.1px);
+                    transform: rotateX(90deg) translateZ(0.1px);
                     will-change: transform;
                 }
                 
@@ -681,15 +692,15 @@ class FlipClockCard extends HTMLElement {
                 }
 
                 @keyframes rotateTop {
-                    0% { transform: rotateX(0deg); }
-                    100% { transform: rotateX(-90deg); }
+                    0% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(-90deg) translateZ(0.1px); transform: rotateX(-90deg) translateZ(0.1px); }
                 }
 
                 @keyframes rotateBottom {
-                    0% { transform: rotateX(90deg); }
-                    60% { transform: rotateX(0deg); }
-                    80% { transform: rotateX(15deg); }
-                    100% { transform: rotateX(0deg); }
+                    0% { -webkit-transform: rotateX(90deg) translateZ(0.1px); transform: rotateX(90deg) translateZ(0.1px); }
+                    60% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    80% { -webkit-transform: rotateX(15deg) translateZ(0.1px); transform: rotateX(15deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
                 }
             `;
             
