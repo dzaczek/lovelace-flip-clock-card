@@ -24,7 +24,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '26.5.1';
+        this.version = '26.5.2';
     }
 
     /**
@@ -646,8 +646,8 @@ class FlipClockCard extends HTMLElement {
                     line-height: var(--card-size);
                     align-items: center;
                 }
-                .upper span { transform: translateY(0); }
-                .lower span { transform: translateY(-50%); }
+                .upper span { -webkit-transform: translateY(0) translateZ(0); transform: translateY(0) translateZ(0); }
+                .lower span { -webkit-transform: translateY(-50%) translateZ(0); transform: translateY(-50%) translateZ(0); }
 
                 .upper::after {
                     content: "";
@@ -681,19 +681,34 @@ class FlipClockCard extends HTMLElement {
                 }
                 
                 .flip-down-top {
+                    -webkit-animation: rotateTop var(--half-speed) linear forwards;
                     animation: rotateTop var(--half-speed) linear forwards;
                     will-change: transform;
                 }
 
                 .flip-down-bottom {
-                    animation: rotateBottom var(--half-speed) linear forwards; 
+                    -webkit-animation: rotateBottom var(--half-speed) linear forwards;
+                    -webkit-animation-delay: var(--half-speed);
+                    animation: rotateBottom var(--half-speed) linear forwards;
                     animation-delay: var(--half-speed);
                     will-change: transform;
+                }
+
+                @-webkit-keyframes rotateTop {
+                    0% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(-90deg) translateZ(0.1px); transform: rotateX(-90deg) translateZ(0.1px); }
                 }
 
                 @keyframes rotateTop {
                     0% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
                     100% { -webkit-transform: rotateX(-90deg) translateZ(0.1px); transform: rotateX(-90deg) translateZ(0.1px); }
+                }
+
+                @-webkit-keyframes rotateBottom {
+                    0% { -webkit-transform: rotateX(90deg) translateZ(0.1px); transform: rotateX(90deg) translateZ(0.1px); }
+                    60% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    80% { -webkit-transform: rotateX(15deg) translateZ(0.1px); transform: rotateX(15deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
                 }
 
                 @keyframes rotateBottom {
