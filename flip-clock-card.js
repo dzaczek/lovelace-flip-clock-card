@@ -24,7 +24,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '26.5.2';
+        this.version = '26.5.3';
     }
 
     /**
@@ -663,6 +663,8 @@ class FlipClockCard extends HTMLElement {
                     z-index: 1;
                     -webkit-transform: translateZ(0);
                     transform: translateZ(0);
+                    -webkit-backface-visibility: visible;
+                    backface-visibility: visible;
                 }
                 
                 .upper.flip-card { 
