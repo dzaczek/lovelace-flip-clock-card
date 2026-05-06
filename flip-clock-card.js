@@ -440,6 +440,7 @@ class FlipClockCard extends HTMLElement {
                     align-items: center;
                     padding: 20px;
                     background: transparent;
+                    -webkit-perspective: 1000px;
                     perspective: 1000px;
                     flex-direction: ${
                         (this.label_position === 'top' || this.label_position === 'bottom') ||
@@ -627,6 +628,7 @@ class FlipClockCard extends HTMLElement {
                 .upper {
                     top: 0;
                     border-radius: var(--flip-radius) var(--flip-radius) 0 0;
+                    -webkit-transform-origin: 50% 100%;
                     transform-origin: 50% 100%;
                     z-index: 1;
                 }
@@ -634,6 +636,7 @@ class FlipClockCard extends HTMLElement {
                 .lower {
                     bottom: 0;
                     border-radius: 0 0 var(--flip-radius) var(--flip-radius);
+                    -webkit-transform-origin: 50% 0%;
                     transform-origin: 50% 0%;
                     z-index: 1;
                 }
@@ -646,8 +649,8 @@ class FlipClockCard extends HTMLElement {
                     line-height: var(--card-size);
                     align-items: center;
                 }
-                .upper span { transform: translateY(0); }
-                .lower span { transform: translateY(-50%); }
+                .upper span { -webkit-transform: translateY(0) translateZ(0); transform: translateY(0) translateZ(0); }
+                .lower span { -webkit-transform: translateY(-50%) translateZ(0); transform: translateY(-50%) translateZ(0); }
 
                 .upper::after {
                     content: "";
@@ -667,6 +670,7 @@ class FlipClockCard extends HTMLElement {
                 
                 .upper.flip-card { 
                     z-index: 10; 
+                    -webkit-transform-origin: bottom;
                     transform-origin: bottom;
                     -webkit-transform: rotateX(0deg) translateZ(0.1px);
                     transform: rotateX(0deg) translateZ(0.1px);
@@ -674,6 +678,7 @@ class FlipClockCard extends HTMLElement {
                 }
                 .lower.flip-card { 
                     z-index: 10; 
+                    -webkit-transform-origin: top;
                     transform-origin: top; 
                     -webkit-transform: rotateX(90deg) translateZ(0.1px);
                     transform: rotateX(90deg) translateZ(0.1px);
@@ -681,19 +686,34 @@ class FlipClockCard extends HTMLElement {
                 }
                 
                 .flip-down-top {
+                    -webkit-animation: rotateTop var(--half-speed) linear forwards;
                     animation: rotateTop var(--half-speed) linear forwards;
                     will-change: transform;
                 }
 
                 .flip-down-bottom {
+                    -webkit-animation: rotateBottom var(--half-speed) linear forwards;
+                    -webkit-animation-delay: var(--half-speed);
                     animation: rotateBottom var(--half-speed) linear forwards; 
                     animation-delay: var(--half-speed);
                     will-change: transform;
                 }
 
+                @-webkit-keyframes rotateTop {
+                    0% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(-90deg) translateZ(0.1px); transform: rotateX(-90deg) translateZ(0.1px); }
+                }
+
                 @keyframes rotateTop {
                     0% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
                     100% { -webkit-transform: rotateX(-90deg) translateZ(0.1px); transform: rotateX(-90deg) translateZ(0.1px); }
+                }
+
+                @-webkit-keyframes rotateBottom {
+                    0% { -webkit-transform: rotateX(90deg) translateZ(0.1px); transform: rotateX(90deg) translateZ(0.1px); }
+                    60% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
+                    80% { -webkit-transform: rotateX(15deg) translateZ(0.1px); transform: rotateX(15deg) translateZ(0.1px); }
+                    100% { -webkit-transform: rotateX(0deg) translateZ(0.1px); transform: rotateX(0deg) translateZ(0.1px); }
                 }
 
                 @keyframes rotateBottom {
