@@ -27,6 +27,10 @@ class FlipClockCard extends HTMLElement {
         this.version = '26.5.3';
     }
 
+    set hass(hass) {
+        this._hass = hass;
+    }
+
     /**
      * Sanitize CSS value to prevent injection attacks
      * @param {string} value - CSS value to sanitize
@@ -155,6 +159,9 @@ class FlipClockCard extends HTMLElement {
             // Configuration parameters with validation
             this.config = config || {};
             
+            // Extract entity for timer functionality
+            this.entity = config?.entity || null;
+
             // Validate and sanitize size (10-500px range)
             this.card_size = this.validateNumber(config?.size, 10, 500, 100);
             
@@ -933,42 +940,66 @@ class FlipClockCard extends HTMLElement {
             try {
                 const now = new Date();
                 let h, m, s;
+                let isPm = false;
 
-                // Use timezone if specified, otherwise local time
-                if (this.timezone) {
-                    // Use specified timezone
-                    try {
-                        const formatter = new Intl.DateTimeFormat('en-US', {
-                            timeZone: this.timezone,
-                            hour: 'numeric',
-                            minute: 'numeric',
-                            second: 'numeric',
-                            hour12: false
-                        });
-                        const parts = formatter.formatToParts(now);
-                        h = parseInt(parts.find(p => p.type === 'hour').value);
-                        m = parseInt(parts.find(p => p.type === 'minute').value);
-                        s = parseInt(parts.find(p => p.type === 'second').value);
-                    } catch (tzError) {
-                        // Fallback to local time if timezone is invalid
-                        if (this.debug) {
-                            console.error("FlipClockCard: Invalid timezone, falling back to local time:", tzError);
+                if (this.entity && this._hass && this._hass.states[this.entity]) {
+                    const stateObj = this._hass.states[this.entity];
+                    let remainingMs = 0;
+
+                    if (stateObj.state === 'active' && stateObj.attributes.finishes_at) {
+                        const finishesAt = new Date(stateObj.attributes.finishes_at).getTime();
+                        remainingMs = Math.max(0, finishesAt - now.getTime());
+                    } else {
+                        let timeStr = stateObj.attributes.remaining || (stateObj.state === 'idle' ? stateObj.attributes.duration : null);
+                        if (timeStr) {
+                            const parts = String(timeStr).split(':');
+                            if (parts.length === 3) {
+                                remainingMs = (parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2])) * 1000;
+                            }
                         }
+                    }
+
+                    const totalSeconds = Math.floor(remainingMs / 1000);
+                    h = Math.floor(totalSeconds / 3600);
+                    if (h > 99) h = 99; // Cap at 99 so it doesn't break display
+                    m = Math.floor((totalSeconds % 3600) / 60);
+                    s = totalSeconds % 60;
+                } else {
+                    // Use timezone if specified, otherwise local time
+                    if (this.timezone) {
+                        // Use specified timezone
+                        try {
+                            const formatter = new Intl.DateTimeFormat('en-US', {
+                                timeZone: this.timezone,
+                                hour: 'numeric',
+                                minute: 'numeric',
+                                second: 'numeric',
+                                hour12: false
+                            });
+                            const parts = formatter.formatToParts(now);
+                            h = parseInt(parts.find(p => p.type === 'hour').value);
+                            m = parseInt(parts.find(p => p.type === 'minute').value);
+                            s = parseInt(parts.find(p => p.type === 'second').value);
+                        } catch (tzError) {
+                            // Fallback to local time if timezone is invalid
+                            if (this.debug) {
+                                console.error("FlipClockCard: Invalid timezone, falling back to local time:", tzError);
+                            }
+                            h = now.getHours();
+                            m = now.getMinutes();
+                            s = now.getSeconds();
+                        }
+                    } else {
                         h = now.getHours();
                         m = now.getMinutes();
                         s = now.getSeconds();
                     }
-                } else {
-                    h = now.getHours();
-                    m = now.getMinutes();
-                    s = now.getSeconds();
-                }
 
-                // 12-hour format logic
-                let isPm = false;
-                if (this.time_format === '12') {
-                    isPm = h >= 12;
-                    h = h % 12 || 12;
+                    // 12-hour format logic
+                    if (this.time_format === '12') {
+                        isPm = h >= 12;
+                        h = h % 12 || 12;
+                    }
                 }
 
                 const hStr = String(h).padStart(2, '0');
@@ -1185,6 +1216,7 @@ class FlipClockCard extends HTMLElement {
      */
     static getStubConfig() {
         return {
+            entity: '',
             size: 100,
             time_format: '24',
             show_seconds: false,
@@ -1257,6 +1289,10 @@ class FlipClockCardEditor extends HTMLElement {
 
         this.innerHTML = `
             <div class="card-config">
+                <div class="option">
+                    <label class="label">Entity (Timer)</label>
+                    <input type="text" class="value" id="entity" value="${this._config.entity || ''}" placeholder="e.g., timer.my_timer">
+                </div>
                 <div class="option">
                     <label class="label">Theme</label>
                     <select class="value" id="theme">
