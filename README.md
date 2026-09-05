@@ -124,6 +124,7 @@ theme: classic
 | Parameter | Type | Default | Range/Options | Description |
 |-----------|------|---------|---------------|-------------|
 | `type` | string | **required** | `custom:flip-clock-card` | Card type identifier |
+| `entity` | string | `null` | `timer.x` | Optional timer entity to display countdown |
 | `size` | number | `100` | `10-500` | Height of each flip tile in pixels |
 | `time_format` | string | `'24'` | `'12'`, `'24'` | 12-hour or 24-hour time format |
 | `show_seconds` | boolean | `false` | `true`, `false` | Display seconds |
@@ -493,6 +494,7 @@ Complete list of all available parameters with types, defaults, and valid ranges
 
 ```yaml
 type: custom:flip-clock-card           # Required - Card type identifier
+entity: null                            # Default: null, Optional timer entity
 size: 100                               # Default: 100, Range: 10-500 (pixels)
 time_format: '24'                       # Default: '24', Options: '12', '24'
 show_seconds: false                     # Default: false, Type: boolean
