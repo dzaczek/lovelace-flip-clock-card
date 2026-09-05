@@ -12,6 +12,11 @@ This card features a smooth 3D flip-down animation with a satisfying bounce effe
 - [Features](#features)
 - [Quick Reference](#quick-reference)
 - [Installation](#installation)
+- [Timer Countdown](#timer-countdown)
+  - [Create a Timer Helper](#create-a-timer-helper)
+  - [Display a Timer](#display-a-timer)
+  - [Timer Controls](#timer-controls)
+  - [Use a Timer in an Automation](#use-a-timer-in-an-automation)
 - [Configuration](#configuration)
   - [Configuration Parameters](#configuration-parameters)
   - [Configuration Examples](#configuration-examples)
@@ -32,6 +37,7 @@ This card features a smooth 3D flip-down animation with a satisfying bounce effe
 * **World Timezones** - Support for 100+ cities with custom labels
 * **Multiple Themes** - 14 built-in themes plus custom styling options
 * **AM/PM Indicator** - Customizable AM/PM display with multiple positions and styles
+* **Timer Countdown** - Display a Home Assistant `timer.*` entity as an animated countdown
 
 ---
 
@@ -47,6 +53,7 @@ This card features a smooth 3D flip-down animation with a satisfying bounce effe
 | Show timezone label | `show_label: true` + `custom_label: 'NYC'` |
 | Display different timezone | `timezone: 'America/New_York'` |
 | Show AM/PM (12h only) | `am_pm_indicator: true` |
+| Display a timer countdown | `entity: timer.pomodoro` |
 | Customize colors | Use `custom_style` object |
 
 ---
@@ -57,14 +64,19 @@ This card features a smooth 3D flip-down animation with a satisfying bounce effe
 
 **Home Assistant Community Store - easiest method:**
 
-1. Open **HACS** in your Home Assistant
-2. Go to **Frontend** section
-3. Click the **3 dots menu** (top right) → **Custom repositories**
-4. Paste this repository URL: `https://github.com/yourusername/lovelace-flip-clock-card`
-5. Select **Lovelace** as the category
-6. Click **Add**, then click **Install**
-7. Restart Home Assistant
-8. Hard refresh your browser (Ctrl+F5 or Cmd+Shift+R)
+1. Open **HACS** in Home Assistant.
+2. Open the **three-dot menu** (top right) and choose **Custom repositories**.
+3. Paste `https://github.com/dzaczek/lovelace-flip-clock-card`.
+4. Select **Dashboard** as the type. In older HACS releases this type is called **Lovelace**.
+5. Click **Add**, find **Flip Clock Card** in HACS, and click **Download**.
+6. Reload the browser page (Ctrl+F5 or Cmd+Shift+R).
+
+HACS normally registers the dashboard resource automatically. If the card is not listed in the card picker after reloading, add this resource in **Settings** → **Dashboards** → **Resources**:
+
+```yaml
+url: /hacsfiles/lovelace-flip-clock-card/flip-clock-card.js
+type: module
+```
 
 ### Method 2: Manual Installation
 
@@ -82,7 +94,7 @@ This card features a smooth 3D flip-down animation with a satisfying bounce effe
    ```yaml
    resources:
      - url: /local/flip-clock-card.js
-   type: module
+       type: module
    ```
 
 4. **Clear cache**: Hard refresh your browser (Ctrl+F5 / Cmd+Shift+R)
@@ -95,6 +107,141 @@ After installation, the card should appear in the Lovelace card picker:
 2. Click **Add Card**
 3. Search for "Flip Clock Card"
 4. Configure and enjoy!
+
+---
+
+## Timer Countdown
+
+Set `entity` to a Home Assistant Timer Helper (`timer.*`) to turn the card into a countdown. Without `entity`, the card continues to display a clock as usual.
+
+The card reads the standard Timer Helper state and updates the remaining time every second:
+
+| Timer state | What the card displays |
+|-------------|------------------------|
+| `active` | The time remaining until `finishes_at` |
+| `paused` | The saved `remaining` time |
+| `idle` | The timer's configured `duration` |
+
+After a timer finishes or is cancelled, Home Assistant returns it to `idle`, so the configured duration is displayed again. Timer values are shown as `HH:MM:SS`. The hours field is capped at `99`, so timers lasting 100 hours or more cannot be represented accurately.
+
+For a countdown, use `show_seconds: true` if seconds should be visible. `timezone`, `time_format`, and the AM/PM indicator apply to clock mode and are not useful for a timer countdown.
+
+### Create a Timer Helper
+
+The easiest option is to create it in Home Assistant: go to **Settings** → **Devices & services** → **Helpers** → **Create helper** → **Timer**. Give it a name and set its initial duration. Home Assistant will create an entity such as `timer.pomodoro`.
+
+Alternatively, define a timer in `configuration.yaml` and restart Home Assistant or reload the Timer integration:
+
+```yaml
+timer:
+  pomodoro:
+    name: Pomodoro
+    duration: "00:25:00"
+    restore: true
+```
+
+`restore: true` restores an active or paused timer after a Home Assistant restart.
+
+### Display a Timer
+
+Use the entity ID of the Timer Helper in the card configuration:
+
+```yaml
+type: custom:flip-clock-card
+entity: timer.pomodoro
+size: 100
+show_seconds: true
+theme: classic
+```
+
+If the entity ID is omitted, invalid, or unavailable, the card falls back to normal clock mode. Check **Developer Tools** → **States** to confirm the exact entity ID.
+
+### Timer Controls
+
+The card is display-only. Add standard Lovelace Button cards to start, pause, and reset the timer. The example below is a complete stack; replace every occurrence of `timer.pomodoro` with your own entity ID.
+
+```yaml
+type: vertical-stack
+cards:
+  - type: custom:flip-clock-card
+    entity: timer.pomodoro
+    size: 100
+    show_seconds: true
+    theme: classic
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: button
+        name: Start / Resume
+        icon: mdi:play
+        tap_action:
+          action: perform-action
+          perform_action: timer.start
+          target:
+            entity_id: timer.pomodoro
+
+      - type: button
+        name: Pause
+        icon: mdi:pause
+        tap_action:
+          action: perform-action
+          perform_action: timer.pause
+          target:
+            entity_id: timer.pomodoro
+
+      - type: button
+        name: Reset
+        icon: mdi:restart
+        tap_action:
+          action: perform-action
+          perform_action: timer.cancel
+          target:
+            entity_id: timer.pomodoro
+```
+
+`timer.start` starts an idle timer and resumes a paused one. `timer.pause` stops the countdown while keeping the remaining time. `timer.cancel` is the reset action: it cancels the timer without firing `timer.finished` and returns it to `idle`, where the card shows its configured duration again. To start a specific duration instead of the configured default, add `data` alongside `target` in the Start button:
+
+```yaml
+          data:
+            duration: "00:25:00"
+```
+
+The button example uses the current Home Assistant `perform-action` syntax. On older Home Assistant releases, use the legacy form `action: call-service` with `service: timer.start` (or `timer.pause` / `timer.cancel`).
+
+### Use a Timer in an Automation
+
+Timers can also be controlled from scripts or automations with the same actions. This example starts the timer when motion is detected:
+
+```yaml
+alias: Start Pomodoro on motion
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.desk_motion
+    to: "on"
+actions:
+  - action: timer.start
+    target:
+      entity_id: timer.pomodoro
+```
+
+To run something when the countdown reaches zero, use the `timer.finished` trigger:
+
+```yaml
+alias: Notify when Pomodoro finishes
+triggers:
+  - trigger: timer.finished
+    target:
+      entity_id: timer.pomodoro
+actions:
+  - action: persistent_notification.create
+    data:
+      title: Pomodoro
+      message: Pomodoro finished.
+```
+
+For the full list of Timer Helper actions and triggers, see the [Home Assistant Timer documentation](https://www.home-assistant.io/integrations/timer/).
 
 ---
 
@@ -124,7 +271,7 @@ theme: classic
 | Parameter | Type | Default | Range/Options | Description |
 |-----------|------|---------|---------------|-------------|
 | `type` | string | **required** | `custom:flip-clock-card` | Card type identifier |
-| `entity` | string | `null` | `timer.x` | Optional timer entity to display countdown |
+| `entity` | string | `null` | `timer.*` | Optional Timer Helper entity; displays its countdown instead of the clock |
 | `size` | number | `100` | `10-500` | Height of each flip tile in pixels |
 | `time_format` | string | `'24'` | `'12'`, `'24'` | 12-hour or 24-hour time format |
 | `show_seconds` | boolean | `false` | `true`, `false` | Display seconds |
@@ -494,7 +641,7 @@ Complete list of all available parameters with types, defaults, and valid ranges
 
 ```yaml
 type: custom:flip-clock-card           # Required - Card type identifier
-entity: null                            # Default: null, Optional timer entity
+entity: null                           # Default: null; optional Timer Helper entity (timer.*)
 size: 100                               # Default: 100, Range: 10-500 (pixels)
 time_format: '24'                       # Default: '24', Options: '12', '24'
 show_seconds: false                     # Default: false, Type: boolean

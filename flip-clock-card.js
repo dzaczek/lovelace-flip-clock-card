@@ -1,8 +1,10 @@
 /**
  * Flip Clock Card for Home Assistant
- * Version: 25.2.7
+ * Version: 26.6.1
  * A retro-style flip clock card with 3D animations
- * New in 25.2.7:
+ * New in 26.6.1:
+ * - Stabilize completed flip animations in Safari/WebKit
+ * Previous features:
  * - Added 'between' position for AM/PM (replaces : separator between hours/minutes)
  * - Fixed vertical orientation for text-style AM/PM indicator
  * Previous features:
@@ -24,7 +26,7 @@ class FlipClockCard extends HTMLElement {
         this.currentDigits = { h1: null, h2: null, m1: null, m2: null, s1: null, s2: null };
         this.debug = false; // Set to true for development debugging
         this.digitElementsCache = {}; // Cache for DOM elements to avoid repeated queries
-        this.version = '26.6.0';
+        this.version = '26.6.1';
     }
 
     set hass(hass) {
@@ -922,7 +924,9 @@ class FlipClockCard extends HTMLElement {
                     topFlip: el.querySelector('.upper.flip-card span'),
                     bottomFlip: el.querySelector('.lower.flip-card span'),
                     topFlipCard: el.querySelector('.upper.flip-card'),
-                    bottomFlipCard: el.querySelector('.lower.flip-card')
+                    bottomFlipCard: el.querySelector('.lower.flip-card'),
+                    topAnimEndHandler: null,
+                    bottomAnimEndHandler: null
                 };
             }
         });
@@ -1086,7 +1090,9 @@ class FlipClockCard extends HTMLElement {
                         topFlip: el.querySelector('.upper.flip-card span'),
                         bottomFlip: el.querySelector('.lower.flip-card span'),
                         topFlipCard: el.querySelector('.upper.flip-card'),
-                        bottomFlipCard: el.querySelector('.lower.flip-card')
+                        bottomFlipCard: el.querySelector('.lower.flip-card'),
+                        topAnimEndHandler: null,
+                        bottomAnimEndHandler: null
                     };
                     
                     // Cache for future use
@@ -1115,14 +1121,49 @@ class FlipClockCard extends HTMLElement {
                     return;
                 }
 
+                // Clean up old animationend handlers before starting new animation
+                if (cached.topAnimEndHandler) {
+                    cached.topFlipCard.removeEventListener('animationend', cached.topAnimEndHandler);
+                    cached.topAnimEndHandler = null;
+                }
+                if (cached.bottomAnimEndHandler) {
+                    cached.bottomFlipCard.removeEventListener('animationend', cached.bottomAnimEndHandler);
+                    cached.bottomAnimEndHandler = null;
+                }
+
+                // Clear inline styles locked by previous animationend handlers
+                cached.topFlipCard.style.transform = '';
+                cached.topFlipCard.style.webkitTransform = '';
+                cached.bottomFlipCard.style.transform = '';
+                cached.bottomFlipCard.style.webkitTransform = '';
+
                 cached.topFlipCard.classList.remove('flip-down-top');
                 cached.bottomFlipCard.classList.remove('flip-down-bottom');
-                
+
                 // Forces reflow (restarts CSS animation)
                 void cached.element.offsetWidth;
 
                 cached.topFlipCard.classList.add('flip-down-top');
                 cached.bottomFlipCard.classList.add('flip-down-bottom');
+
+                // Lock final state via inline style after animation completes.
+                // This ensures the element stays in place even if animation-fill-mode:forwards
+                // is disrupted by a forced reflow on another element under heavy CPU load.
+                cached.topAnimEndHandler = () => {
+                    cached.topFlipCard.style.transform = 'rotateX(-90deg) translateZ(0.1px)';
+                    cached.topFlipCard.style.webkitTransform = 'rotateX(-90deg) translateZ(0.1px)';
+                    cached.topFlipCard.removeEventListener('animationend', cached.topAnimEndHandler);
+                    cached.topAnimEndHandler = null;
+                };
+                cached.topFlipCard.addEventListener('animationend', cached.topAnimEndHandler);
+
+                cached.bottomAnimEndHandler = () => {
+                    cached.bottomFlipCard.style.transform = 'rotateX(0deg) translateZ(0.1px)';
+                    cached.bottomFlipCard.style.webkitTransform = 'rotateX(0deg) translateZ(0.1px)';
+                    cached.bottomFlipCard.removeEventListener('animationend', cached.bottomAnimEndHandler);
+                    cached.bottomAnimEndHandler = null;
+                };
+                cached.bottomFlipCard.addEventListener('animationend', cached.bottomAnimEndHandler);
             } catch (error) {
                 if (this.debug) {
                     console.error(`FlipClockCard: Error updating digit '${id}':`, error);
