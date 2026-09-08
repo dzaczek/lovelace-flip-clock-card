@@ -1,4 +1,6 @@
 # Flip Clock Card 
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/dzaczek)
 ![Preview card](./img/flipfalp.jpg)
 
 A retro-style Flip Clock card for Home Assistant with realistic 3D flip animations inspired by split-flap displays.
